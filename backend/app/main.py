@@ -1,7 +1,12 @@
+import asyncio
+from contextlib import suppress
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import auth, listings, tracking, orders, payments, admin, categories, verification, insights, roles, gigs, reviews, chat, disputes, kyc, sellers
 from app.core.config import settings
+from app.db.bootstrap import ensure_market_schema
+from app.db.session import AsyncSessionLocal, engine
+from app.services.market_levels import recompute_market_levels
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 
@@ -44,6 +49,35 @@ app.include_router(chat.router, prefix="/chat")
 app.include_router(disputes.router)
 app.include_router(kyc.router)
 app.include_router(sellers.router, prefix="/sellers", tags=["sellers"])
+
+
+async def _run_market_level_job() -> None:
+    async with AsyncSessionLocal() as db:
+        await recompute_market_levels(db)
+
+
+async def _market_level_scheduler() -> None:
+    while True:
+        await asyncio.sleep(6 * 60 * 60)
+        with suppress(Exception):
+            await _run_market_level_job()
+
+
+@app.on_event("startup")
+async def startup_tasks() -> None:
+    await ensure_market_schema(engine)
+    with suppress(Exception):
+        await _run_market_level_job()
+    app.state.market_level_task = asyncio.create_task(_market_level_scheduler())
+
+
+@app.on_event("shutdown")
+async def shutdown_tasks() -> None:
+    task = getattr(app.state, "market_level_task", None)
+    if task:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
 
 @app.get("/")
 def read_root():

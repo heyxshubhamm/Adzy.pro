@@ -16,10 +16,13 @@ interface Gig {
   packages?: Package[];
   rating?: number | null;
   reviews_count?: number;
+  gig_level?: string;
   seller?: {
     username: string;
     avatar_url?: string;
     publisher_level?: number;
+    adzy_choice?: boolean;
+    level_label?: string;
   } | null;
 }
 

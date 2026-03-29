@@ -17,10 +17,13 @@ interface GigCardProps {
   packages?: Package[];
   rating?: number | null;
   reviews_count?: number;
+  gig_level?: string;
   seller?: {
     username: string;
     avatar_url?: string;
     publisher_level?: number;
+    adzy_choice?: boolean;
+    level_label?: string;
   } | null;
 }
 
@@ -31,6 +34,7 @@ const GigCard: React.FC<GigCardProps> = ({
   min_price,
   packages,
   rating,
+  gig_level,
   seller,
 }) => {
   const displayPrice =
@@ -41,11 +45,26 @@ const GigCard: React.FC<GigCardProps> = ({
       : null;
 
   const primaryTag = tags?.[0];
+  const sellerLevelNum = seller?.adzy_choice ? 4 : seller?.publisher_level ?? 0;
+  const levelLabel = seller?.level_label
+    ? seller.level_label
+    : seller?.adzy_choice
+    ? "Adzy Choice"
+    : sellerLevelNum >= 0
+    ? ["New Seller", "Level 1", "Level 2", "Best Seller", "Adzy Choice"][sellerLevelNum] ?? "New Seller"
+    : "New Seller";
 
   return (
     <div className={styles.card}>
       <div className={styles.cardHeader}>
-        {primaryTag && <div className={styles.nicheBadge}>#{primaryTag}</div>}
+        <div className={styles.leftBadges}>
+          {primaryTag && <div className={styles.nicheBadge}>#{primaryTag}</div>}
+          {gig_level && gig_level !== "standard" && (
+            <div className={`${styles.gigLevelBadge} ${styles[`gig_${gig_level}`]}`}>
+              {gig_level.toUpperCase()}
+            </div>
+          )}
+        </div>
         {rating != null && (
           <div className={styles.scoreBadge}>★ {Number(rating).toFixed(1)}</div>
         )}
@@ -83,9 +102,9 @@ const GigCard: React.FC<GigCardProps> = ({
             </div>
           )}
           <span className={styles.username}>{seller?.username ?? 'Verified Seller'}</span>
-          {seller?.publisher_level != null && seller.publisher_level > 0 && (
-            <span className={`${styles.levelBadge} ${styles[`level${seller.publisher_level}`]}`}>
-              {['', 'Lvl 1', 'Lvl 2', 'Top Rated', 'Pro'][seller.publisher_level]}
+          {sellerLevelNum > 0 && (
+            <span className={`${styles.levelBadge} ${styles[`level${sellerLevelNum}`]}`}>
+              {levelLabel}
             </span>
           )}
         </div>

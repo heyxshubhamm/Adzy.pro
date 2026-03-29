@@ -37,6 +37,10 @@ export interface GigOut {
   description: string;
   tags: string[];
   status: string;
+  gig_level?: "standard" | "hot" | "recommended" | "trending";
+  orders_last_7d?: number;
+  ctr_7d?: number | null;
+  conversion_7d?: number | null;
   category_id?: string | null;
   subcategory?: string | null;
   packages: PackageOut[];

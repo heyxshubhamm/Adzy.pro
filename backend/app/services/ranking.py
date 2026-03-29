@@ -84,8 +84,18 @@ def calculate_final_score(listing: any, max_values: Dict[str, float], total_impr
     
     # 2. Level Multiplier (Trust Layer)
     level = getattr(listing.seller, "publisher_level", 0)
+    adzy_choice = bool(getattr(listing.seller, "adzy_choice", False))
     level_multipliers = {0: 1.0, 1: 1.1, 2: 1.25, 3: 1.4, 4: 1.6}
-    level_multiplier = level_multipliers.get(level, 1.0)
+    level_multiplier = 1.7 if adzy_choice else level_multipliers.get(level, 1.0)
+
+    # 2.1 Gig-level overlay (Hot, Recommended, Trending)
+    gig_level = (getattr(listing, "gig_level", "standard") or "standard").lower()
+    gig_level_multiplier = {
+        "standard": 1.0,
+        "hot": 1.12,
+        "recommended": 1.10,
+        "trending": 1.14,
+    }.get(gig_level, 1.0)
     
     # 3. New Gig Boost (ABC Discovery Layer)
     days_old = (datetime.now(timezone.utc) - listing.created_at.replace(tzinfo=timezone.utc)).days
@@ -110,6 +120,7 @@ def calculate_final_score(listing: any, max_values: Dict[str, float], total_impr
     final_score = (
         base_score * 
         level_multiplier * 
+        gig_level_multiplier *
         new_boost * 
         freshness * 
         narad * 

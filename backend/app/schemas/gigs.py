@@ -82,6 +82,21 @@ class SellerBrief(BaseModel):
     username: str
     avatar_url: Optional[str] = None
     publisher_level: int = 0
+    adzy_choice: bool = False
+
+    @computed_field
+    @property
+    def level_label(self) -> str:
+        if self.adzy_choice or self.publisher_level >= 4:
+            return "Adzy Choice"
+        if self.publisher_level >= 3:
+            return "Best Seller"
+        if self.publisher_level == 2:
+            return "Level 2"
+        if self.publisher_level == 1:
+            return "Level 1"
+        return "New Seller"
+
     class Config:
         from_attributes = True
 
@@ -94,6 +109,10 @@ class GigOut(BaseModel):
     status: str
     rating: Optional[Decimal] = None
     reviews_count: int = 0
+    gig_level: Optional[str] = "standard"
+    orders_last_7d: int = 0
+    ctr_7d: Optional[Decimal] = None
+    conversion_7d: Optional[Decimal] = None
     category_id: Optional[UUID] = None
     subcategory: Optional[str] = None
     packages: List[PackageOut]

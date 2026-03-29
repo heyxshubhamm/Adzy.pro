@@ -23,6 +23,7 @@ class User(Base):
     
     # Levels
     publisher_level = Column(Integer, default=0) # 0 to 4
+    adzy_choice = Column(Boolean, default=False)
     last_level_eval = Column(DateTime(timezone=True), nullable=True)
     
     avatar_url = Column(String, nullable=True)
@@ -57,6 +58,10 @@ class Gig(Base):
     views = Column(Integer, default=0)
     risk_score = Column(Numeric(5, 2), default=0.0)
     risk_report = Column(Text, nullable=True)
+    gig_level = Column(String(20), default="standard")  # standard, hot, recommended, trending
+    orders_last_7d = Column(Integer, default=0)
+    ctr_7d = Column(Numeric(6, 4), default=0.0)
+    conversion_7d = Column(Numeric(6, 4), default=0.0)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())

@@ -21,6 +21,12 @@
   gap: 8px;
 }
 
+.leftBadges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .nicheBadge {
   background: rgba(0, 240, 255, 0.1);
   color: #00f0ff;
@@ -35,6 +41,33 @@
   color: #f5c842;
   font-size: 13px;
   font-weight: 700;
+}
+
+.gigLevelBadge {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gig_hot {
+  background: rgba(249, 115, 22, 0.18);
+  color: #fdba74;
+  border: 1px solid rgba(249, 115, 22, 0.35);
+}
+
+.gig_recommended {
+  background: rgba(16, 185, 129, 0.18);
+  color: #86efac;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.gig_trending {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
 }
 
 .cardContent {

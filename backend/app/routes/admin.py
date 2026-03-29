@@ -4,6 +4,7 @@ from sqlalchemy import select, func, desc
 from app.db.session import get_db
 from app.core.dependencies import require_admin
 from app.models.models import User, Gig, Order, Payment
+from app.services.market_levels import recompute_market_levels
 from app.schemas.schemas import UserResponse
 from app.schemas.gigs import GigOut
 from typing import List
@@ -129,3 +130,12 @@ async def get_neural_grid(
             "pulse": random.uniform(0.1, 1.0)
         })
     return grid
+
+
+@router.post("/ranking/recompute")
+async def recompute_ranking_levels(
+    user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await recompute_market_levels(db)
+    return {"status": "ok", "result": result}
