@@ -24,6 +24,7 @@ interface GigCardProps {
     publisher_level?: number;
     adzy_choice?: boolean;
     level_label?: string;
+    seller_score?: number;
   } | null;
 }
 
@@ -106,6 +107,9 @@ const GigCard: React.FC<GigCardProps> = ({
             <span className={`${styles.levelBadge} ${styles[`level${sellerLevelNum}`]}`}>
               {levelLabel}
             </span>
+          )}
+          {seller?.seller_score != null && (
+            <span className={styles.sellerScore}>Score {Number(seller.seller_score).toFixed(1)}</span>
           )}
         </div>
         {displayPrice != null && (

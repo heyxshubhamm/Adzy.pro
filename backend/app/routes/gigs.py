@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, or_, func
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 import uuid as uuid_lib
 from app.db.session import get_db
+from app.core.config import settings
 from app.core.dependencies import require_seller, get_current_user, get_current_user_optional
 from app.models.models import User, Gig, GigPackage, GigRequirement, GigMedia, Review, SellerProfile
 from app.schemas.gigs import (
@@ -15,6 +16,7 @@ from app.media.s3 import generate_presigned_put, delete_object as delete_s3_obje
 from app.media.tasks import process_image, process_video
 import re
 from pydantic import BaseModel
+from app.services.market_scoring import stable_ab_bucket
 
 router = APIRouter(tags=["gigs"])
 
@@ -29,6 +31,7 @@ def _load_gig_options():
 # --- Public marketplace list ---
 @router.get("", response_model=List[GigOut])
 async def list_gigs(
+    request: Request,
     q: Optional[str] = Query(None, description="Search by title or tag"),
     category_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
@@ -56,7 +59,47 @@ async def list_gigs(
             pass
 
     result = await db.execute(query)
-    return result.scalars().all()
+    gigs = result.scalars().all()
+
+    # A/B: route a small deterministic bucket to the new scoring ranker.
+    user_fingerprint = (
+        request.cookies.get("session")
+        or request.headers.get("x-forwarded-for")
+        or request.client.host
+        or "anonymous"
+    )
+    bucket = stable_ab_bucket(user_fingerprint)
+    use_new_scoring = bucket < settings.NEW_SCORING_TRAFFIC_PCT
+
+    if use_new_scoring:
+        query_text = (q or "").strip().lower()
+
+        def relevance_score(gig: Gig) -> float:
+            if not query_text:
+                return 0.5
+            title = (gig.title or "").lower()
+            desc = (gig.description or "").lower()
+            tags = " ".join(gig.tags or []).lower()
+            if query_text in title:
+                return 1.0
+            if query_text in desc:
+                return 0.75
+            if query_text in tags:
+                return 0.65
+            return 0.4
+
+        gigs = sorted(
+            gigs,
+            key=lambda g: (
+                relevance_score(g),
+                float(getattr(getattr(g, "seller", None), "seller_score", 0.0) or 0.0),
+                float(getattr(g, "rating", 0.0) or 0.0),
+                int(getattr(g, "reviews_count", 0) or 0),
+            ),
+            reverse=True,
+        )
+
+    return gigs
 
 
 def _slugify(text: str) -> str:

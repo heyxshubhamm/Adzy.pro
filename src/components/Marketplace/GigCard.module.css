@@ -152,6 +152,15 @@
   white-space: nowrap;
 }
 
+.sellerScore {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
 .levelBadge {
   font-size: 10px;
   font-weight: 700;

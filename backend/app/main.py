@@ -2,11 +2,12 @@ import asyncio
 from contextlib import suppress
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, listings, tracking, orders, payments, admin, categories, verification, insights, roles, gigs, reviews, chat, disputes, kyc, sellers
+from app.routes import auth, listings, tracking, orders, payments, admin, categories, verification, insights, roles, gigs, reviews, chat, disputes, kyc, sellers, score
 from app.core.config import settings
 from app.db.bootstrap import ensure_market_schema
 from app.db.session import AsyncSessionLocal, engine
 from app.services.market_levels import recompute_market_levels
+from app.services.market_scoring import ensure_default_weights, recompute_all_seller_scores
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 
@@ -49,11 +50,13 @@ app.include_router(chat.router, prefix="/chat")
 app.include_router(disputes.router)
 app.include_router(kyc.router)
 app.include_router(sellers.router, prefix="/sellers", tags=["sellers"])
+app.include_router(score.router)
 
 
 async def _run_market_level_job() -> None:
     async with AsyncSessionLocal() as db:
         await recompute_market_levels(db)
+        await recompute_all_seller_scores(db)
 
 
 async def _market_level_scheduler() -> None:
@@ -66,6 +69,8 @@ async def _market_level_scheduler() -> None:
 @app.on_event("startup")
 async def startup_tasks() -> None:
     await ensure_market_schema(engine)
+    async with AsyncSessionLocal() as db:
+        await ensure_default_weights(db)
     with suppress(Exception):
         await _run_market_level_job()
     app.state.market_level_task = asyncio.create_task(_market_level_scheduler())

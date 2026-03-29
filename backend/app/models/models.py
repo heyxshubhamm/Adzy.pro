@@ -24,6 +24,7 @@ class User(Base):
     # Levels
     publisher_level = Column(Integer, default=0) # 0 to 4
     adzy_choice = Column(Boolean, default=False)
+    seller_score = Column(Numeric(5, 2), default=0.0)
     last_level_eval = Column(DateTime(timezone=True), nullable=True)
     
     avatar_url = Column(String, nullable=True)
@@ -224,6 +225,17 @@ class OAuthAccount(Base):
     provider_id = Column(String, nullable=False)
 
     user = relationship("User", back_populates="oauth_accounts")
+
+
+class WeightPolicy(Base):
+    __tablename__ = "weight_policy"
+
+    weight_name = Column(String(30), primary_key=True)
+    weight_pct = Column(Numeric(5, 2), nullable=False)
+    min_pct = Column(Numeric(5, 2), nullable=True)
+    max_pct = Column(Numeric(5, 2), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by = Column(String(50), nullable=True)
 
 
 class Review(Base):

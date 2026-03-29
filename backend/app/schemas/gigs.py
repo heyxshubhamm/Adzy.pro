@@ -83,6 +83,7 @@ class SellerBrief(BaseModel):
     avatar_url: Optional[str] = None
     publisher_level: int = 0
     adzy_choice: bool = False
+    seller_score: Optional[Decimal] = None
 
     @computed_field
     @property

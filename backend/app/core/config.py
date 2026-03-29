@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     PRESIGN_EXPIRY_SECONDS: int = int(os.getenv("PRESIGN_EXPIRY_SECONDS", 300))
     MAX_IMAGE_MB: int = int(os.getenv("MAX_IMAGE_MB", 10))
     MAX_VIDEO_MB: int = int(os.getenv("MAX_VIDEO_MB", 100))
+    NEW_SCORING_TRAFFIC_PCT: int = int(os.getenv("NEW_SCORING_TRAFFIC_PCT", 5))
 
     class Config:
         case_sensitive = True

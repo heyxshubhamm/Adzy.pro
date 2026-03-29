@@ -110,6 +110,7 @@ async def get_seller_profile(
         "member_since": user.created_at.isoformat(),
         "publisher_level": level,
         "adzy_choice": bool(user.adzy_choice),
+        "seller_score": round(float(user.seller_score or 0.0), 2),
         "level_label": LEVEL_LABELS.get(level, "New Seller"),
         "level_color": LEVEL_COLORS.get(level, "#6b7280"),
         "total_orders_completed": user.total_orders_completed or 0,

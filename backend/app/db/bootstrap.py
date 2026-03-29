@@ -28,8 +28,25 @@ async def ensure_market_schema(engine: AsyncEngine) -> None:
     gig_columns = await _get_table_columns(engine, "gigs")
 
     async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS weight_policy (
+                    weight_name VARCHAR(30) PRIMARY KEY,
+                    weight_pct NUMERIC(5,2) NOT NULL,
+                    min_pct NUMERIC(5,2),
+                    max_pct NUMERIC(5,2),
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_by VARCHAR(50)
+                )
+                """
+            )
+        )
+
         if "adzy_choice" not in user_columns:
             await conn.execute(text("ALTER TABLE users ADD COLUMN adzy_choice BOOLEAN DEFAULT FALSE"))
+        if "seller_score" not in user_columns:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN seller_score NUMERIC(5,2) DEFAULT 0"))
 
         if "gig_level" not in gig_columns:
             await conn.execute(text("ALTER TABLE gigs ADD COLUMN gig_level VARCHAR(20) DEFAULT 'standard'"))

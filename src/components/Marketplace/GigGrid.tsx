@@ -23,6 +23,7 @@ interface Gig {
     publisher_level?: number;
     adzy_choice?: boolean;
     level_label?: string;
+    seller_score?: number;
   } | null;
 }
 
