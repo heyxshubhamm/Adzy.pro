@@ -1,5 +1,33 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Monkey Algorithm (Standalone, No API)
+
+A full Monkey Algorithm optimizer is implemented in pure Python at:
+
+- `backend/app/services/monkey_algorithm.py`
+- runner script: `backend/run_monkey_algorithm.py`
+
+This is self-contained and does not require any API route.
+
+### Run constrained paper example
+
+```bash
+python3 backend/run_monkey_algorithm.py --problem paper_example --dim 2 --runs 5
+```
+
+### Run benchmark functions (paper-style set)
+
+```bash
+python3 backend/run_monkey_algorithm.py --problem f2 --dim 30 --runs 5
+python3 backend/run_monkey_algorithm.py --problem f4 --dim 1000 --runs 3
+```
+
+### Run full local suite (f1, f2, f3, f4, f5, f7..f12)
+
+```bash
+python3 backend/run_monkey_algorithm.py --suite --dim 30 --runs 3 --nc 200 --cycles 30
+```
+
 ## Getting Started
 
 First, run the development server:
