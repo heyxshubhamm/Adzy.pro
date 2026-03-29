@@ -5,8 +5,10 @@ import { jwtDecode } from "jwt-decode";
 export type UserRole = "buyer" | "seller" | "admin";
 
 export interface CurrentUser {
-  user_id: string;
+  sub: string;
+  email?: string;
   role:    UserRole;
+  exp?: number;
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -24,10 +26,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
 export function requireServerRole(role: UserRole) {
   // Utility for server components to enforce role-based entry
-  const user = getCurrentUser();
-  if (!user) return null;
-  
-  const hierarchy: Record<string, number> = { buyer: 0, seller: 1, admin: 2 };
-  // Placeholder for redirect logic if needed in specific components
-  return user;
+  const userPromise = getCurrentUser();
+  void role;
+  // Keep compatibility for existing imports; callers should use `src/lib/serverAuth.ts`.
+  return userPromise;
 }

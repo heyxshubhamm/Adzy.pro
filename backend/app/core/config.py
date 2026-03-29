@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings(BaseSettings):
+    ENV: str = os.getenv("ENV", "development")
     PROJECT_NAME: str = "Adzy.pro API"
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = os.getenv("SECRET_KEY", "9823479234792374923")
@@ -17,6 +18,7 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "noreply@yourdomain.com")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     CORS_ALLOWED_ORIGINS: str = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+    COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "")
     VERIFICATION_TOKEN_EXPIRE_HOURS: int = int(os.getenv("VERIFICATION_TOKEN_EXPIRE_HOURS", 24))
     RESEND_COOLDOWN_MINUTES: int = int(os.getenv("RESEND_COOLDOWN_MINUTES", 2))
     

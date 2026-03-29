@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 from typing import List, Optional
 import uuid as uuid_lib
 from app.db.session import get_db
-from app.core.dependencies import require_seller, get_current_user
+from app.core.dependencies import require_seller, get_current_user, get_current_user_optional
 from app.models.models import User, Gig, GigPackage, GigRequirement, GigMedia, Review, SellerProfile
 from app.schemas.gigs import (
     GigCreateIn, GigUpdateIn, GigOut, PresignedURLRequest, PresignedURLOut,
@@ -64,6 +64,11 @@ def _slugify(text: str) -> str:
     text = re.sub(r"[^\w\s-]", "", text)
     slug = re.sub(r"[\s_-]+", "-", text)[:100]
     return f"{slug}-{str(uuid_lib.uuid4())[:8]}" # uniqueness guaranteed
+
+def _validate_media_keys(raw_key: str, processed_key: str, seller_id: str, gig_id: str) -> bool:
+    expected_raw_prefix = f"raw/{seller_id}/{gig_id}/"
+    expected_processed_prefix = f"gigs/{seller_id}/{gig_id}/"
+    return raw_key.startswith(expected_raw_prefix) and processed_key.startswith(expected_processed_prefix)
 
 # --- Create gig ---
 @router.post("", response_model=GigOut, status_code=201)
@@ -280,6 +285,7 @@ async def my_gigs(
 @router.get("/{gig_id}", response_model=GigOut)
 async def get_gig(
     gig_id: str,
+    user: Optional[User] = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
     # Try UUID lookup first, fall back to slug
@@ -293,6 +299,9 @@ async def get_gig(
     gig = result.scalar_one_or_none()
     if not gig or gig.status == "deleted":
         raise HTTPException(status_code=404, detail="Gig not found")
+    if gig.status == "draft":
+        if not user or str(user.id) != str(gig.seller_id):
+            raise HTTPException(status_code=404, detail="Gig not found")
     return gig
 
 # --- Soft delete gig ---
@@ -356,7 +365,11 @@ async def publish_gig(
     user: User = Depends(require_seller),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Gig).where(Gig.id == gig_id))
+    result = await db.execute(
+        select(Gig)
+        .where(Gig.id == gig_id)
+        .options(selectinload(Gig.packages), selectinload(Gig.media))
+    )
     gig = result.scalar_one_or_none()
 
     if not gig or str(gig.seller_id) != str(user.id):
@@ -370,6 +383,13 @@ async def publish_gig(
         errors.append("At least one pricing package is required")
     if not gig.media:
         errors.append("At least one gallery image is required")
+    else:
+        has_ready = any(m.status == "ready" for m in gig.media)
+        has_cover = any(m.is_cover and m.status == "ready" for m in gig.media)
+        if not has_ready:
+            errors.append("At least one media file must finish processing")
+        if not has_cover:
+            errors.append("A ready cover image is required")
     if len(gig.description) < 120:
         errors.append("Professional description min 120 chars required")
     
@@ -435,6 +455,15 @@ async def confirm_media_upload(
     if not gig or str(gig.seller_id) != str(user.id):
         raise HTTPException(status_code=404, detail="Gig not found")
 
+    if body.media_type not in {"image", "video"}:
+        raise HTTPException(status_code=422, detail="Invalid media_type")
+
+    if not _validate_media_keys(body.raw_key, body.processed_key, str(user.id), gig_id):
+        raise HTTPException(status_code=400, detail="Invalid media key scope")
+
+    if body.public_url and body.processed_key not in body.public_url:
+        raise HTTPException(status_code=400, detail="public_url does not match processed key")
+
     # Verify file actually landed in S3
     if not object_exists(body.raw_key):
         raise HTTPException(status_code=400, detail="Upload not found in S3. Please try uploading again.")
@@ -443,6 +472,14 @@ async def confirm_media_upload(
         select(func.count()).select_from(GigMedia).where(GigMedia.gig_id == gig.id)
     )
     sort_order = count_result.scalar()
+    if sort_order >= 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 media files per gig")
+
+    existing_result = await db.execute(
+        select(GigMedia).where(GigMedia.gig_id == gig.id, GigMedia.raw_key == body.raw_key)
+    )
+    if existing_result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="This upload has already been confirmed")
 
     # Unset existing cover if this one is cover (or it's the first file)
     if body.is_cover or sort_order == 0:
@@ -519,6 +556,11 @@ async def delete_media(
     delete_s3_object(media.raw_key)
     if media.processed_key:
         delete_s3_object(media.processed_key)
+    if media.processed_urls:
+        for _, url in (media.processed_urls or {}).items():
+            if isinstance(url, str) and "/gigs/" in url:
+                key = url.split("/gigs/", 1)[-1]
+                delete_s3_object(f"gigs/{key}")
 
     await db.delete(media)
     await db.commit()

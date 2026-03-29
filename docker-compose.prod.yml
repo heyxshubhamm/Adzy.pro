@@ -13,6 +13,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - default
 
   redis:
     image: redis:7-alpine
@@ -22,6 +24,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - default
 
   backend:
     build:
@@ -29,8 +33,10 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
+      ENV: production
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN}
       SECRET_KEY: ${SECRET_KEY}
       REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY}
       SESSION_SECRET: ${SESSION_SECRET}
@@ -52,6 +58,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - default
+      - edge
 
   worker:
     build:
@@ -74,6 +83,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - default
 
   frontend:
     build:
@@ -85,6 +96,9 @@ services:
       NEXT_PUBLIC_API_URL: https://${API_DOMAIN}
     depends_on:
       - backend
+    networks:
+      - default
+      - edge
 
   caddy:
     image: caddy:2-alpine
@@ -95,6 +109,8 @@ services:
     environment:
       APP_DOMAIN: ${APP_DOMAIN}
       API_DOMAIN: ${API_DOMAIN}
+      STAGING_APP_DOMAIN: ${STAGING_APP_DOMAIN}
+      STAGING_API_DOMAIN: ${STAGING_API_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -103,8 +119,15 @@ services:
     depends_on:
       - frontend
       - backend
+    networks:
+      - edge
 
 volumes:
   postgres_data:
   caddy_data:
   caddy_config:
+
+networks:
+  edge:
+    external: true
+    name: adzy_edge

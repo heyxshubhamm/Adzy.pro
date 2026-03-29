@@ -2,6 +2,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import styles from "./VerifyEmail.module.css";
+import { ResendButton } from "@/components/ResendButton";
 
 // Layer 1: Identity Activation Loop (Email Verification)
 function VerifyEmailContent() {
@@ -50,7 +51,12 @@ function VerifyEmailContent() {
       
       {status === "verifying" && <div className={styles.pulse}></div>}
       {status === "success" && <div className={styles.check}>✓</div>}
-      {status === "error" && <div className={styles.retry} onClick={() => window.location.reload()}>Retry Handshake</div>}
+      {status === "error" && (
+        <div className="flex flex-col items-center gap-3">
+          <div className={styles.retry} onClick={() => window.location.reload()}>Retry Handshake</div>
+          <ResendButton />
+        </div>
+      )}
     </div>
   );
 }

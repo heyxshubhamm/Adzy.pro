@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtDecode } from "jwt-decode";
 
-const PROTECTED = ["/dashboard", "/orders", "/listing/create", "/admin"];
+const PROTECTED = ["/dashboard", "/orders", "/gigs/create", "/admin"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -37,4 +37,4 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/dashboard/:path*", "/admin/:path*", "/listing/create", "/orders/:path*"] };
+export const config = { matcher: ["/dashboard/:path*", "/admin/:path*", "/gigs/create", "/orders/:path*"] };

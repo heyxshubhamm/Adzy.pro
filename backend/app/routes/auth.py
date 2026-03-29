@@ -12,6 +12,8 @@ from app.auth.verification import (
     generate_verification_token, store_verification_token,
     validate_verification_token, consume_verification_token,
     can_resend, set_resend_cooldown,
+    can_resend_email, set_resend_cooldown_email,
+    can_resend_ip, set_resend_cooldown_ip,
 )
 from app.auth.email import send_verification_email, send_welcome_email
 from app.core.dependencies import get_current_user
@@ -19,7 +21,7 @@ from app.core.config import settings
 from passlib.context import CryptContext
 from authlib.integrations.starlette_client import OAuth
 from fastapi.responses import RedirectResponse
-from fastapi import APIRouter, Depends, HTTPException, Response, Cookie, Request, Query
+from fastapi import Query
 from datetime import datetime, timezone
 
 router = APIRouter()
@@ -36,6 +38,9 @@ oauth.register(
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+
+class ResendVerificationIn(BaseModel):
+    email: EmailStr | None = None
 
 @router.post("/register", status_code=201)
 async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
@@ -81,7 +86,11 @@ async def login(body: LoginIn, response: Response, db: AsyncSession = Depends(ge
     return {"user": {"id": str(user.id), "email": user.email, "role": user.role}}
 
 @router.post("/refresh")
-async def refresh(response: Response, refresh_token: str | None = Cookie(None), db: AsyncSession = Depends(get_db)):
+async def refresh(
+    response: Response,
+    refresh_token: str | None = Cookie(None, alias="refresh_token"),
+    db: AsyncSession = Depends(get_db),
+):
     if not refresh_token:
         raise HTTPException(status_code=401, detail="No refresh token provided")
 
@@ -108,14 +117,18 @@ async def refresh(response: Response, refresh_token: str | None = Cookie(None), 
     return {"message": "Tokens refreshed"}
 
 @router.post("/logout")
-async def logout(response: Response, refresh_token: str | None = Cookie(None), access_token: str | None = Cookie(None)):
+async def logout(
+    response: Response,
+    refresh_token: str | None = Cookie(None, alias="refresh_token"),
+    access_token: str | None = Cookie(None, alias="access_token"),
+):
     if access_token:
         try:
             payload = decode_access_token(access_token)
             jti = payload.get("jti")
             exp = payload.get("exp", 0)
             remaining_ttl = max(0, int(exp - datetime.now(timezone.utc).timestamp()))
-            if jti:
+            if jti and remaining_ttl > 0:
                 await blacklist_access_token(jti, remaining_ttl)
         except ValueError:
             pass
@@ -178,19 +191,49 @@ async def verify_email(
 
 @router.post("/resend-verification")
 async def resend_verification(
-    user: User = Depends(get_current_user),
+    request: Request,
+    body: ResendVerificationIn | None = None,
     db: AsyncSession = Depends(get_db),
 ):
+    ip = request.client.host if request.client else "unknown"
+    if not await can_resend_ip(ip):
+        raise HTTPException(
+            status_code=429,
+            detail=f"Please wait {settings.RESEND_COOLDOWN_MINUTES} minutes before requesting another email",
+        )
+
+    user: User | None = None
+
+    token = request.cookies.get("access_token")
+    if token:
+        try:
+            payload = decode_access_token(token)
+            result = await db.execute(select(User).where(User.id == payload["sub"]))
+            user = result.scalar_one_or_none()
+        except ValueError:
+            user = None
+
+    if user is None and body and body.email:
+        result = await db.execute(select(User).where(User.email == body.email.strip().lower()))
+        user = result.scalar_one_or_none()
+
+    # Always return generic success when account doesn't exist to avoid enumeration.
+    if user is None:
+        await set_resend_cooldown_ip(ip)
+        return {"message": "If this email exists, a verification email has been sent"}
+
     if user.is_verified:
         raise HTTPException(status_code=400, detail="Email is already verified")
 
-    if not await can_resend(str(user.id)):
+    if not await can_resend(str(user.id)) or not await can_resend_email(user.email):
         raise HTTPException(
             status_code=429,
-            detail=f"Please wait {settings.RESEND_COOLDOWN_MINUTES} minutes before requesting another email"
+            detail=f"Please wait {settings.RESEND_COOLDOWN_MINUTES} minutes before requesting another email",
         )
 
     await set_resend_cooldown(str(user.id))
+    await set_resend_cooldown_email(user.email)
+    await set_resend_cooldown_ip(ip)
     await _send_verification(user)
     return {"message": "Verification email sent"}
 

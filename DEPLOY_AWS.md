@@ -67,6 +67,7 @@ Wait for DNS propagation (usually 5-30 min, sometimes longer).
 ## 5) Start production stack
 
 ```bash
+docker network create adzy_edge || true
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
 ```
 
@@ -82,10 +83,27 @@ When Caddy finishes certificate issuance, your URLs should work:
 - `https://www.APP_DOMAIN`
 - `https://API_DOMAIN/docs`
 
-## 6) Update / redeploy later
+## 6) Start independent staging stack
+
+```bash
+docker compose --env-file .env.production -f docker-compose.staging.yml up -d --build
+```
+
+Check status:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.staging.yml ps
+```
+
+Staging URLs:
+- `https://STAGING_APP_DOMAIN`
+- `https://STAGING_API_DOMAIN/docs`
+
+## 7) Update / redeploy later
 
 ```bash
 cd ~/Adzy.pro
 git pull
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.production -f docker-compose.staging.yml up -d --build
 ```

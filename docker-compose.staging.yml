@@ -1,0 +1,103 @@
+services:
+  postgres_staging:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB_STAGING:-adzy_staging}
+      POSTGRES_USER: ${POSTGRES_USER_STAGING:-adzy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_STAGING:-adzy_staging_password}
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_STAGING:-adzy}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis_staging:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend_staging:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER_STAGING:-adzy}:${POSTGRES_PASSWORD_STAGING:-adzy_staging_password}@postgres_staging:5432/${POSTGRES_DB_STAGING:-adzy_staging}
+      REDIS_URL: redis://redis_staging:6379
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-.adzy.pro}
+      SECRET_KEY: ${SECRET_KEY_STAGING:-change-me-staging}
+      REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY_STAGING:-change-refresh-staging}
+      SESSION_SECRET: ${SESSION_SECRET_STAGING:-change-session-staging}
+      FRONTEND_URL: https://${STAGING_APP_DOMAIN}
+      CORS_ALLOWED_ORIGINS: https://${STAGING_APP_DOMAIN}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@adzy.pro}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-eu-north-1}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-adzy-gigs}
+      S3_RAW_PREFIX: ${S3_RAW_PREFIX:-raw/}
+      S3_PROCESSED_PREFIX: ${S3_PROCESSED_PREFIX:-gigs/}
+      CDN_BASE_URL: ${CDN_BASE_URL:-https://cdn.adzy.pro}
+    depends_on:
+      postgres_staging:
+        condition: service_healthy
+      redis_staging:
+        condition: service_healthy
+    networks:
+      - default
+      - edge
+
+  worker_staging:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A app.media.tasks worker --loglevel=info --concurrency=2
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER_STAGING:-adzy}:${POSTGRES_PASSWORD_STAGING:-adzy_staging_password}@postgres_staging:5432/${POSTGRES_DB_STAGING:-adzy_staging}
+      REDIS_URL: redis://redis_staging:6379
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-eu-north-1}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-adzy-gigs}
+      S3_RAW_PREFIX: ${S3_RAW_PREFIX:-raw/}
+      S3_PROCESSED_PREFIX: ${S3_PROCESSED_PREFIX:-gigs/}
+      CDN_BASE_URL: ${CDN_BASE_URL:-https://cdn.adzy.pro}
+    depends_on:
+      postgres_staging:
+        condition: service_healthy
+      redis_staging:
+        condition: service_healthy
+
+  frontend_staging:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://${STAGING_API_DOMAIN}
+    depends_on:
+      - backend_staging
+    networks:
+      - default
+      - edge
+
+volumes:
+  postgres_staging_data:
+
+networks:
+  edge:
+    external: true
+    name: adzy_edge

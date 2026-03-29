@@ -92,7 +92,7 @@ function LoginContent() {
               <p>{error}</p>
               {isUnverified && (
                 <div className="mt-4 pt-4 border-t border-red-500/10">
-                  <ResendButton />
+                  <ResendButton email={email} />
                 </div>
               )}
             </div>

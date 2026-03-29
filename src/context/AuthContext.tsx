@@ -6,7 +6,7 @@ export type UserRole = "buyer" | "seller" | "admin";
 export interface AuthUser {
   id: string;
   email: string;
-  username: string;
+  username?: string;
   role: UserRole;
   avatar_url?: string;
 }

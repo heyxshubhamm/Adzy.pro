@@ -1,5 +1,4 @@
 import hashlib, hmac, secrets, os
-from datetime import timedelta
 from .token_store import redis_client
 
 # Layer 4: Verification Loop (HMAC-Signed Tokens)
@@ -40,3 +39,28 @@ async def can_resend(user_id: str) -> bool:
 async def set_resend_cooldown(user_id: str) -> None:
     """Invokes the resend-cooldown lock in Redis to prevent email flooding."""
     await redis_client.setex(f"verify_cooldown:{user_id}", COOLDOWN_TTL, "1")
+
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+def _email_fingerprint(email: str) -> str:
+    return hashlib.sha256(_normalize_email(email).encode()).hexdigest()
+
+def _ip_fingerprint(ip: str) -> str:
+    return hashlib.sha256(ip.encode()).hexdigest()
+
+async def can_resend_email(email: str) -> bool:
+    key = f"verify_cooldown_email:{_email_fingerprint(email)}"
+    return not bool(await redis_client.exists(key))
+
+async def set_resend_cooldown_email(email: str) -> None:
+    key = f"verify_cooldown_email:{_email_fingerprint(email)}"
+    await redis_client.setex(key, COOLDOWN_TTL, "1")
+
+async def can_resend_ip(ip: str) -> bool:
+    key = f"verify_cooldown_ip:{_ip_fingerprint(ip)}"
+    return not bool(await redis_client.exists(key))
+
+async def set_resend_cooldown_ip(ip: str) -> None:
+    key = f"verify_cooldown_ip:{_ip_fingerprint(ip)}"
+    await redis_client.setex(key, COOLDOWN_TTL, "1")

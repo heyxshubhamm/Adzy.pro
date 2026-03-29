@@ -18,7 +18,11 @@ export function useRequireRole(requiredRole: UserRole) {
     // Identify user standing for hierarchy-based routing
     const hierarchy: Record<UserRole, number> = { buyer: 0, seller: 1, admin: 2 };
     if (hierarchy[user.role] < hierarchy[requiredRole]) {
-      router.replace("/become-seller");
+      if (user.role === "buyer" && requiredRole === "seller") {
+        router.replace("/become-seller");
+      } else {
+        router.replace("/unauthorized");
+      }
     }
   }, [user, loading, requiredRole, router]);
 

@@ -9,12 +9,39 @@ export interface PackageOut {
   features: string[];
 }
 
+export interface RequirementOut {
+  id: string;
+  question: string;
+  input_type: "text" | "textarea" | "file" | "multiple_choice";
+  choices?: string[];
+  is_required: boolean;
+  sort_order: number;
+}
+
 export interface MediaItem {
   id: string;
   url: string;
   media_type: "image" | "video";
   is_cover: boolean;
+  raw_key?: string;
+  processed_key?: string;
+  sort_order?: number;
+  status?: "processing" | "ready" | "error";
   processed_urls?: Record<string, string>;
+}
+
+export interface GigOut {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  tags: string[];
+  status: string;
+  category_id?: string | null;
+  subcategory?: string | null;
+  packages: PackageOut[];
+  requirements: RequirementOut[];
+  media: MediaItem[];
 }
 
 export interface SellerPublicOut {
@@ -70,7 +97,9 @@ export interface GigDetailOut {
     id: string;
     question: string;
     input_type: string;
+    choices?: string[];
     is_required: boolean;
+    sort_order?: number;
   }>;
   media: MediaItem[];
   reviews: ReviewOut[];

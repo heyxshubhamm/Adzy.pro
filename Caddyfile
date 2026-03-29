@@ -15,3 +15,15 @@ www.{$APP_DOMAIN} {
   tls {$ACME_EMAIL}
   reverse_proxy backend:8000
 }
+
+{$STAGING_APP_DOMAIN} {
+  encode gzip zstd
+  tls {$ACME_EMAIL}
+  reverse_proxy frontend_staging:3000
+}
+
+{$STAGING_API_DOMAIN} {
+  encode gzip zstd
+  tls {$ACME_EMAIL}
+  reverse_proxy backend_staging:8000
+}

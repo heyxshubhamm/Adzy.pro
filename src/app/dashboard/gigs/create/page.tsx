@@ -74,23 +74,37 @@ export default function CreateListingWizard() {
     if (!file || !gigId) return;
 
     try {
-      const { upload_url, s3_key, public_url } = await apiFetch<{
+      const { upload_url, raw_key, processed_key, public_url } = await apiFetch<{
         upload_url: string;
-        s3_key: string;
+        raw_key: string;
+        processed_key: string;
         public_url: string;
       }>(`/gigs/${gigId}/media/presign`, {
         method: "POST",
-        body: JSON.stringify({ filename: file.name, content_type: file.type, media_type: "image" }),
+        body: JSON.stringify({ filename: file.name, content_type: file.type, media_type: "image", file_size: file.size }),
       });
 
       await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
 
       await apiFetch(`/gigs/${gigId}/media/confirm`, {
         method: "POST",
-        body: JSON.stringify({ s3_key, public_url, media_type: "image" }),
+        body: JSON.stringify({ raw_key, processed_key, public_url, media_type: "image" }),
       });
 
-      updateData({ media: [...data.media, { s3_key, url: public_url, is_cover: data.media.length === 0 }] });
+      updateData({
+        media: [
+          ...data.media,
+          {
+            raw_key,
+            processed_key,
+            s3_key: processed_key,
+            url: public_url,
+            is_cover: data.media.length === 0,
+            media_type: "image",
+            status: "processing",
+          },
+        ],
+      });
     } catch {
       setError("Image upload failed. Please try again.");
     }

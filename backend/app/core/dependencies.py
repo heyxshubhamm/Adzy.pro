@@ -36,6 +36,27 @@ async def get_current_user(
     
     return user
 
+
+async def get_current_user_optional(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    token = request.cookies.get("access_token")
+    if not token:
+        return None
+
+    try:
+        payload = decode_access_token(token)
+    except ValueError:
+        return None
+
+    jti = payload.get("jti")
+    if jti and await is_access_token_blacklisted(jti):
+        return None
+
+    result = await db.execute(select(User).where(User.id == payload["sub"]))
+    return result.scalar_one_or_none()
+
 def require_role(*roles: str):
     async def checker(user: User = Depends(get_current_user)) -> User:
         if user.role not in roles:

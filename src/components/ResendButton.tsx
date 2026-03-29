@@ -1,16 +1,19 @@
 "use client";
 import { useState, useEffect } from "react";
 
-export function ResendButton() {
+export function ResendButton({ email }: { email?: string }) {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error" | "cooldown">("idle");
   const [cooldown, setCooldown] = useState(0);
+  const [message, setMessage] = useState("");
 
   async function resend() {
     setStatus("sending");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/resend-verification`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/resend-verification`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify(email ? { email } : {}),
       });
       const data = await res.json();
 
@@ -21,12 +24,15 @@ export function ResendButton() {
       }
 
       if (res.ok) {
+        setMessage(data.message || "Email sent! Check your inbox.");
         setStatus("sent");
         setTimeout(() => setStatus("idle"), 5000);
       } else {
+        setMessage(data.detail || "Failed to send. Try again.");
         setStatus("error");
       }
     } catch (err) {
+      setMessage("Failed to send. Try again.");
       setStatus("error");
     }
   }
@@ -60,15 +66,15 @@ export function ResendButton() {
         </div>
       )}
       {status === "sent" && (
-        <p className="text-emerald-500 text-sm font-medium">Email sent! Check your inbox.</p>
+        <p className="text-emerald-500 text-sm font-medium">{message || "Email sent! Check your inbox."}</p>
       )}
       {status === "error" && (
-        <button
-          onClick={resend}
-          className="text-rose-500 hover:text-rose-400 font-semibold text-sm transition-colors"
-        >
-          Failed to send. Try again?
-        </button>
+        <div className="text-center">
+          <p className="text-rose-500 text-sm mb-2">{message || "Failed to send."}</p>
+          <button onClick={resend} className="text-rose-400 hover:text-rose-300 font-semibold text-sm transition-colors">
+            Try again
+          </button>
+        </div>
       )}
       {status === "cooldown" && (
         <p className="text-slate-500 text-sm">
