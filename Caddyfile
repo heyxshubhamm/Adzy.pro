@@ -1,0 +1,17 @@
+{$APP_DOMAIN} {
+  encode gzip zstd
+  tls {$ACME_EMAIL}
+  reverse_proxy frontend:3000
+}
+
+www.{$APP_DOMAIN} {
+  encode gzip zstd
+  tls {$ACME_EMAIL}
+  redir https://{$APP_DOMAIN}{uri} permanent
+}
+
+{$API_DOMAIN} {
+  encode gzip zstd
+  tls {$ACME_EMAIL}
+  reverse_proxy backend:8000
+}

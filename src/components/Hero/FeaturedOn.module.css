@@ -1,0 +1,57 @@
+.section {
+  padding: 4rem 0;
+  background: #fdfdfd;
+  overflow: hidden;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.marqueeContainer {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.marquee {
+  display: flex;
+  width: max-content;
+  gap: 4rem;
+  animation: scrollLeftToRight 30s linear infinite;
+}
+
+.logoItem {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ccc;
+  white-space: nowrap;
+  letter-spacing: -0.5px;
+  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+}
+
+.logoItem:hover {
+  color: #666;
+}
+
+@keyframes scrollLeftToRight {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* Pause on hover */
+.marqueeContainer:hover .marquee {
+  animation-play-state: paused;
+}

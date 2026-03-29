@@ -1,0 +1,98 @@
+.section {
+  padding: 6rem 0;
+  background: #fdfdfd;
+}
+
+@media (max-width: 768px) {
+  .section {
+    padding: 3rem 1.5rem;
+  }
+}
+
+.top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 3.5rem;
+  text-align: center;
+}
+
+.title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: #404145;
+  letter-spacing: -0.5px;
+  text-align: center;
+  width: 100%;
+}
+
+.joinBtn {
+  background: var(--primary);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.joinBtn:hover {
+  background: var(--primary-hover);
+}
+
+.divider {
+  height: 1px;
+  background: #e4e5e7;
+  width: 100%;
+  margin-bottom: 3rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3rem;
+}
+
+.feature {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.iconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.featureText {
+  font-size: 1rem;
+  color: #404145;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+@media (max-width: 992px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 3rem 2rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.5rem;
+  }
+  
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+  
+  .title {
+    font-size: 1.75rem;
+  }
+}

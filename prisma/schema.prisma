@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum ListingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  LIVE
+  REPLACED
+  CANCELLED
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  name      String?
+  role      UserRole  @default(BUYER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  listings  Listing[] @relation("SellerListings")
+  orders    Order[]   @relation("BuyerOrders")
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  icon        String?
+  description String?
+  banner      String?
+  parentId    String?
+  parent      Category?  @relation("SubCategories", fields: [parentId], references: [id])
+  children    Category[] @relation("SubCategories")
+  listings    Listing[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Listing {
+  id           String        @id @default(uuid())
+  name         String        // Domain name
+  niche        String
+  traffic      String
+  dr           Int
+  price        Float
+  status       ListingStatus @default(PENDING)
+  sellerId     String
+  seller       User          @relation("SellerListings", fields: [sellerId], references: [id])
+  categoryId   String?
+  category     Category?     @relation(fields: [categoryId], references: [id])
+  orders       Order[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  trafficProof String?       // URL to GA proof or screenshot
+}
+
+model Order {
+  id         String      @id @default(uuid())
+  listingId  String
+  listing    Listing     @relation(fields: [listingId], references: [id])
+  buyerId    String
+  buyer      User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  status     OrderStatus @default(PENDING)
+  linkUrl    String?     // Target URL for the backlink
+  anchorText String?
+  details    String?     // Special instructions
+  liveUrl    String?     // URL where the link is live
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}

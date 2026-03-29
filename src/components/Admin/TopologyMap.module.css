@@ -1,0 +1,65 @@
+.wrapper {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.svg {
+  max-width: 600px;
+  width: 100%;
+  height: auto;
+}
+
+.core {
+  fill: #00f0ff;
+  filter: drop-shadow(0 0 15px rgba(0, 240, 255, 0.6));
+  animation: corePulse 3s infinite ease-in-out;
+}
+
+.coreLabel {
+  fill: #000;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.node {
+  fill: rgba(0, 240, 255, 0.3);
+  stroke: #00f0ff;
+  stroke-width: 2px;
+  transition: all 0.3s ease;
+}
+
+.link {
+  stroke: rgba(0, 240, 255, 0.15);
+  stroke-width: 1px;
+  stroke-dasharray: 4;
+  animation: linkFlow 20s linear infinite;
+}
+
+.label {
+  fill: rgba(255, 255, 255, 0.4);
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.seed { fill: #00f0ff; r: 16; filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.5)); }
+.node { fill: #00c3ff; r: 10; }
+.satellite { fill: #5b7efb; r: 7; opacity: 0.6; }
+
+@keyframes corePulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(0, 240, 255, 0.4)); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(0, 240, 255, 0.7)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(0, 240, 255, 0.4)); }
+}
+
+@keyframes linkFlow {
+  from { stroke-dashoffset: 200; }
+  to { stroke-dashoffset: 0; }
+}

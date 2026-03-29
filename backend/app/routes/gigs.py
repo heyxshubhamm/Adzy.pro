@@ -1,0 +1,553 @@
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, BackgroundTasks
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete, or_, func
+from sqlalchemy.orm import selectinload
+from typing import List, Optional
+import uuid as uuid_lib
+from app.db.session import get_db
+from app.core.dependencies import require_seller, get_current_user
+from app.models.models import User, Gig, GigPackage, GigRequirement, GigMedia, Review, SellerProfile
+from app.schemas.gigs import (
+    GigCreateIn, GigUpdateIn, GigOut, PresignedURLRequest, PresignedURLOut,
+    GigDetailOut, SellerPublicOut, ReviewDetailOut, RelatedGigOut,
+)
+from app.media.s3 import generate_presigned_put, delete_object as delete_s3_object, object_exists
+from app.media.tasks import process_image, process_video
+import re
+from pydantic import BaseModel
+
+router = APIRouter(tags=["gigs"])
+
+def _load_gig_options():
+    return (
+        selectinload(Gig.packages),
+        selectinload(Gig.requirements),
+        selectinload(Gig.media),
+        selectinload(Gig.seller),
+    )
+
+# --- Public marketplace list ---
+@router.get("", response_model=List[GigOut])
+async def list_gigs(
+    q: Optional[str] = Query(None, description="Search by title or tag"),
+    category_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
+        select(Gig)
+        .where(Gig.status == "active")
+        .options(*_load_gig_options())
+        .order_by(Gig.created_at.desc())
+    )
+
+    if q:
+        query = query.where(
+            or_(
+                Gig.title.ilike(f"%{q}%"),
+                Gig.description.ilike(f"%{q}%"),
+            )
+        )
+
+    if category_id:
+        try:
+            cat_uuid = uuid_lib.UUID(category_id)
+            query = query.where(Gig.category_id == cat_uuid)
+        except ValueError:
+            pass
+
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+def _slugify(text: str) -> str:
+    text = text.lower().strip()
+    text = re.sub(r"[^\w\s-]", "", text)
+    slug = re.sub(r"[\s_-]+", "-", text)[:100]
+    return f"{slug}-{str(uuid_lib.uuid4())[:8]}" # uniqueness guaranteed
+
+# --- Create gig ---
+@router.post("", response_model=GigOut, status_code=201)
+async def create_gig(
+    body: GigCreateIn,
+    user: User = Depends(require_seller),
+    db: AsyncSession = Depends(get_db),
+):
+    gig = Gig(
+        seller_id = user.id,
+        title = body.title,
+        slug = _slugify(body.title),
+        description = body.description,
+        category_id = body.category_id,
+        subcategory = body.subcategory,
+        tags = body.tags,
+        status = "draft",
+    )
+    db.add(gig)
+    await db.flush() # get id before adding packages
+
+    for pkg in body.packages:
+        db.add(GigPackage(gig_id=gig.id, **pkg.model_dump()))
+
+    for i, req in enumerate(body.requirements):
+        db.add(GigRequirement(gig_id=gig.id, sort_order=i, **req.model_dump()))
+
+    await db.commit()
+    result2 = await db.execute(select(Gig).where(Gig.id == gig.id).options(*_load_gig_options()))
+    return result2.scalar_one()
+
+# --- Top gigs for ISR static params ---
+@router.get("/top", response_model=List[GigOut])
+async def top_gigs(
+    limit: int = Query(100, le=500),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Gig)
+        .where(Gig.status == "active")
+        .options(*_load_gig_options())
+        .order_by(Gig.rating.desc().nullslast(), Gig.reviews_count.desc())
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+
+# --- Full gig detail by slug (reviews + related + seller profile) ---
+@router.get("/slug/{slug}", response_model=GigDetailOut)
+async def get_gig_detail(
+    slug: str,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Gig)
+        .options(
+            *_load_gig_options(),
+            selectinload(Gig.seller).selectinload(User.seller_profile),
+        )
+        .where(Gig.slug == slug, Gig.status == "active")
+    )
+    gig = result.scalar_one_or_none()
+    if not gig:
+        raise HTTPException(status_code=404, detail="Gig not found")
+
+    # Latest 10 reviews
+    reviews_result = await db.execute(
+        select(Review)
+        .options(selectinload(Review.reviewer))
+        .where(Review.gig_id == gig.id)
+        .order_by(Review.created_at.desc())
+        .limit(10)
+    )
+    reviews = reviews_result.scalars().all()
+
+    # Related gigs — same category, different seller, active
+    related_rows = []
+    if gig.category_id:
+        rel_result = await db.execute(
+            select(
+                Gig.id, Gig.title, Gig.slug,
+                Gig.rating.label("avg_rating"),
+                Gig.reviews_count.label("review_count"),
+                func.min(GigPackage.price).label("price_from"),
+            )
+            .join(GigPackage, GigPackage.gig_id == Gig.id)
+            .where(
+                Gig.category_id == gig.category_id,
+                Gig.seller_id != gig.seller_id,
+                Gig.status == "active",
+                Gig.id != gig.id,
+            )
+            .group_by(Gig.id, Gig.title, Gig.slug, Gig.rating, Gig.reviews_count)
+            .order_by(Gig.rating.desc().nullslast())
+            .limit(6)
+        )
+        related_rows = rel_result.all()
+
+    related_gigs = []
+    for row in related_rows:
+        cover_result = await db.execute(
+            select(GigMedia.url)
+            .where(GigMedia.gig_id == row.id, GigMedia.is_cover == True)
+            .limit(1)
+        )
+        cover_url = cover_result.scalar_one_or_none()
+        related_gigs.append(RelatedGigOut(
+            id=row.id, title=row.title, slug=row.slug,
+            cover_url=cover_url, price_from=row.price_from,
+            avg_rating=float(row.avg_rating) if row.avg_rating else None,
+            review_count=row.review_count,
+        ))
+
+    # Increment view count asynchronously
+    background_tasks.add_task(_increment_views, db, str(gig.id))
+
+    # Build seller public profile
+    sp: SellerProfile | None = gig.seller.seller_profile
+    seller_out = SellerPublicOut(
+        id=gig.seller.id,
+        username=gig.seller.username,
+        avatar_url=gig.seller.avatar_url,
+        display_name=sp.display_name if sp else gig.seller.username,
+        bio=sp.bio if sp else None,
+        seller_level=sp.seller_level if sp else "new",
+        member_since=gig.seller.created_at,
+        completed_orders=sp.completed_orders if sp else 0,
+        avg_rating=float(gig.rating) if gig.rating else None,
+        review_count=gig.reviews_count,
+        response_time=sp.response_time if sp else None,
+        languages=sp.languages if sp else [],
+        country=sp.country if sp else None,
+        is_available=sp.is_available if sp else True,
+    )
+
+    review_outs = [
+        ReviewDetailOut(
+            id=r.id,
+            rating=r.rating,
+            comment=r.comment,
+            created_at=r.created_at,
+            buyer_name=r.reviewer.username if r.reviewer else "Buyer",
+            buyer_avatar=r.reviewer.avatar_url if r.reviewer else None,
+        )
+        for r in reviews
+    ]
+
+    return GigDetailOut(
+        id=gig.id,
+        title=gig.title,
+        slug=gig.slug,
+        description=gig.description,
+        tags=gig.tags or [],
+        status=gig.status,
+        views=gig.views or 0,
+        review_count=gig.reviews_count,
+        avg_rating=float(gig.rating) if gig.rating else None,
+        created_at=gig.created_at,
+        seller=seller_out,
+        packages=gig.packages,
+        requirements=[
+            {"id": str(r.id), "question": r.question,
+             "input_type": r.input_type, "is_required": r.is_required}
+            for r in gig.requirements
+        ],
+        media=sorted(
+            [
+                {"id": str(m.id), "url": m.url, "media_type": m.media_type,
+                 "is_cover": m.is_cover, "processed_urls": m.processed_urls or {}}
+                for m in gig.media
+            ],
+            key=lambda m: m.get("sort_order", 0),
+        ),
+        reviews=review_outs,
+        related_gigs=related_gigs,
+    )
+
+
+@router.post("/{gig_id}/impression", status_code=204)
+async def record_impression(
+    gig_id: str,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Client-side impression tracker — increments views, fire-and-forget."""
+    background_tasks.add_task(_increment_views, db, gig_id)
+
+
+async def _increment_views(db: AsyncSession, gig_id: str):
+    await db.execute(
+        Gig.__table__.update()
+        .where(Gig.id == gig_id)
+        .values(views=Gig.views + 1)
+    )
+    await db.commit()
+
+
+# --- List seller's own gigs ---
+@router.get("/my/gigs", response_model=List[GigOut])
+async def my_gigs(
+    user: User = Depends(require_seller),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Gig)
+        .where(Gig.seller_id == user.id, Gig.status != "deleted")
+        .options(*_load_gig_options())
+        .order_by(Gig.created_at.desc())
+    )
+    return result.scalars().all()
+
+# --- Get single gig (by id or slug) ---
+@router.get("/{gig_id}", response_model=GigOut)
+async def get_gig(
+    gig_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    # Try UUID lookup first, fall back to slug
+    opts = _load_gig_options()
+    try:
+        parsed_id = uuid_lib.UUID(gig_id)
+        result = await db.execute(select(Gig).where(Gig.id == parsed_id).options(*opts))
+    except ValueError:
+        result = await db.execute(select(Gig).where(Gig.slug == gig_id).options(*opts))
+
+    gig = result.scalar_one_or_none()
+    if not gig or gig.status == "deleted":
+        raise HTTPException(status_code=404, detail="Gig not found")
+    return gig
+
+# --- Soft delete gig ---
+@router.delete("/{gig_id}", status_code=204)
+async def delete_gig(
+    gig_id: str,
+    user: User = Depends(require_seller),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Gig).where(Gig.id == gig_id))
+    gig = result.scalar_one_or_none()
+    if not gig or str(gig.seller_id) != str(user.id):
+        raise HTTPException(status_code=404, detail="Gig not found")
+    gig.status = "deleted"
+    await db.commit()
+
+# --- Update gig ---
+@router.patch("/{gig_id}", response_model=GigOut)
+async def update_gig(
+    gig_id: str,
+    body: GigUpdateIn,
+    user: User = Depends(require_seller),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Gig).where(Gig.id == gig_id))
+    gig = result.scalar_one_or_none()
+
+    if not gig:
+        raise HTTPException(status_code=404, detail="Gig not found")
+    if str(gig.seller_id) != str(user.id):
+        raise HTTPException(status_code=403, detail="Not your gig")
+
+    # Update base fields
+    for field in ("title", "description", "category_id", "subcategory", "tags"):
+        val = getattr(body, field)
+        if val is not None:
+            setattr(gig, field, val)
+            if field == "title":
+                gig.slug = _slugify(val)
+
+    # Full replace packages
+    if body.packages is not None:
+        await db.execute(delete(GigPackage).where(GigPackage.gig_id == gig.id))
+        for pkg in body.packages:
+            db.add(GigPackage(gig_id=gig.id, **pkg.model_dump()))
+
+    # Full replace requirements
+    if body.requirements is not None:
+        await db.execute(delete(GigRequirement).where(GigRequirement.gig_id == gig.id))
+        for i, req in enumerate(body.requirements):
+            db.add(GigRequirement(gig_id=gig.id, sort_order=i, **req.model_dump()))
+
+    await db.commit()
+    result2 = await db.execute(select(Gig).where(Gig.id == gig.id).options(*_load_gig_options()))
+    return result2.scalar_one()
+
+# --- Publish gig ---
+@router.post("/{gig_id}/publish", response_model=GigOut)
+async def publish_gig(
+    gig_id: str,
+    user: User = Depends(require_seller),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Gig).where(Gig.id == gig_id))
+    gig = result.scalar_one_or_none()
+
+    if not gig or str(gig.seller_id) != str(user.id):
+        raise HTTPException(status_code=404, detail="Gig not found")
+    if gig.status == "active":
+        raise HTTPException(status_code=400, detail="Gig is already active")
+
+    # Min validation for publishing
+    errors = []
+    if not gig.packages:
+        errors.append("At least one pricing package is required")
+    if not gig.media:
+        errors.append("At least one gallery image is required")
+    if len(gig.description) < 120:
+        errors.append("Professional description min 120 chars required")
+    
+    if errors:
+        raise HTTPException(status_code=422, detail={"errors": errors})
+
+    gig.status = "active"
+    await db.commit()
+    result2 = await db.execute(select(Gig).where(Gig.id == gig.id).options(*_load_gig_options()))
+    return result2.scalar_one()
+
+# --- S3 Media Endpoints ---
+
+@router.post("/{gig_id}/media/presign", response_model=PresignedURLOut)
+async def presign_media_upload(
+    gig_id: str,
+    body: PresignedURLRequest,
+    user: User = Depends(require_seller),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Gig).where(Gig.id == gig_id))
+    gig = result.scalar_one_or_none()
+    if not gig or str(gig.seller_id) != str(user.id):
+        raise HTTPException(status_code=404, detail="Gig not found")
+
+    count_result = await db.execute(
+        select(func.count()).select_from(GigMedia).where(GigMedia.gig_id == gig.id)
+    )
+    if count_result.scalar() >= 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 media files per gig")
+
+    try:
+        data = generate_presigned_put(
+            seller_id=str(user.id),
+            gig_id=gig_id,
+            content_type=body.content_type,
+            file_size=body.file_size,
+            media_type=body.media_type,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    return data
+
+
+class MediaConfirmIn(BaseModel):
+    raw_key: str
+    processed_key: str
+    public_url: str
+    media_type: str
+    is_cover: bool = False
+
+
+@router.post("/{gig_id}/media/confirm")
+async def confirm_media_upload(
+    gig_id: str,
+    body: MediaConfirmIn,
+    user: User = Depends(require_seller),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Gig).where(Gig.id == gig_id))
+    gig = result.scalar_one_or_none()
+    if not gig or str(gig.seller_id) != str(user.id):
+        raise HTTPException(status_code=404, detail="Gig not found")
+
+    # Verify file actually landed in S3
+    if not object_exists(body.raw_key):
+        raise HTTPException(status_code=400, detail="Upload not found in S3. Please try uploading again.")
+
+    count_result = await db.execute(
+        select(func.count()).select_from(GigMedia).where(GigMedia.gig_id == gig.id)
+    )
+    sort_order = count_result.scalar()
+
+    # Unset existing cover if this one is cover (or it's the first file)
+    if body.is_cover or sort_order == 0:
+        await db.execute(
+            GigMedia.__table__.update()
+            .where(GigMedia.gig_id == gig.id)
+            .values(is_cover=False)
+        )
+
+    media = GigMedia(
+        gig_id=gig.id,
+        media_type=body.media_type,
+        raw_key=body.raw_key,
+        processed_key=body.processed_key,
+        url=body.public_url,
+        status="processing",
+        sort_order=sort_order,
+        is_cover=body.is_cover or sort_order == 0,
+    )
+    db.add(media)
+    await db.commit()
+    await db.refresh(media)
+
+    # Dispatch async processing
+    if body.media_type == "image":
+        process_image.delay(body.raw_key, body.processed_key, str(media.id))
+    else:
+        process_video.delay(body.raw_key, body.processed_key, str(media.id))
+
+    return {"id": str(media.id), "status": "processing", "url": body.public_url}
+
+
+@router.get("/{gig_id}/media/{media_id}/status")
+async def media_status(
+    gig_id: str,
+    media_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Frontend polls this until status = 'ready'."""
+    result = await db.execute(
+        select(GigMedia).where(GigMedia.id == media_id, GigMedia.gig_id == gig_id)
+    )
+    media = result.scalar_one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+    return {
+        "id": str(media.id),
+        "status": media.status,
+        "processed_urls": media.processed_urls,
+        "url": media.url,
+    }
+
+
+@router.delete("/{gig_id}/media/{media_id}", status_code=204)
+async def delete_media(
+    gig_id: str,
+    media_id: str,
+    user: User = Depends(require_seller),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(GigMedia).where(GigMedia.id == media_id, GigMedia.gig_id == gig_id)
+    )
+    media = result.scalar_one_or_none()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    # Verify ownership via gig
+    gig_result = await db.execute(select(Gig).where(Gig.id == gig_id))
+    gig = gig_result.scalar_one_or_none()
+    if not gig or str(gig.seller_id) != str(user.id):
+        raise HTTPException(status_code=403, detail="Not your gig")
+
+    delete_s3_object(media.raw_key)
+    if media.processed_key:
+        delete_s3_object(media.processed_key)
+
+    await db.delete(media)
+    await db.commit()
+
+
+class ReorderIn(BaseModel):
+    ordered_ids: list[str]
+
+
+@router.patch("/{gig_id}/media/reorder", status_code=204)
+async def reorder_media(
+    gig_id: str,
+    body: ReorderIn,
+    user: User = Depends(require_seller),
+    db: AsyncSession = Depends(get_db),
+):
+    gig_result = await db.execute(select(Gig).where(Gig.id == gig_id))
+    gig = gig_result.scalar_one_or_none()
+    if not gig or str(gig.seller_id) != str(user.id):
+        raise HTTPException(status_code=403, detail="Not your gig")
+
+    result = await db.execute(
+        select(GigMedia).where(GigMedia.gig_id == gig_id)
+    )
+    media_map = {str(m.id): m for m in result.scalars().all()}
+
+    for i, mid in enumerate(body.ordered_ids):
+        if mid in media_map:
+            media_map[mid].sort_order = i
+            media_map[mid].is_cover = i == 0
+
+    await db.commit()

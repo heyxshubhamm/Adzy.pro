@@ -1,0 +1,282 @@
+.section {
+  padding: var(--section-padding);
+  background: white;
+}
+
+.inner {
+  background: #111111;
+  border-radius: 24px;
+  padding: 2.5rem 4rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  color: white;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 1200px) {
+  .section {
+    padding: 3rem 1.5rem;
+  }
+  .inner {
+    padding: 4rem 2rem;
+  }
+  .visual {
+    margin-top: 3rem;
+  }
+}
+
+.content {
+  max-width: 600px;
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.logoText {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+.logoAccent {
+  color: #1ed760;
+}
+
+.badge {
+  background: #1ed760;
+  color: #003912;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+.title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 1.5rem;
+  letter-spacing: -1px;
+}
+
+@media (max-width: 992px) {
+  .title {
+    text-align: center;
+  }
+}
+
+.benefits {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 3rem;
+}
+
+.benefits li {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1.125rem;
+  margin-bottom: 1.25rem;
+  opacity: 0.9;
+}
+
+.check {
+  font-weight: 800;
+  color: #1ed760;
+}
+
+.cta {
+  display: inline-block;
+  background: var(--primary);
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
+  margin-bottom: 1.5rem;
+  transition: transform 0.2s ease;
+}
+
+.cta:hover {
+  transform: scale(1.02);
+  background: var(--primary-hover);
+}
+
+.guarantee {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.visual {
+  width: 35%;
+  position: relative;
+  height: 320px;
+}
+
+.cardStack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.card {
+  position: absolute;
+  width: 250px;
+  height: 320px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cardBack1 {
+  right: 15%;
+  top: 10%;
+  transform: rotate(-5deg);
+  z-index: 1;
+}
+
+.cardBack2 {
+  right: 5%;
+  top: 5%;
+  transform: rotate(5deg);
+  z-index: 2;
+}
+
+.mainCard {
+  position: absolute;
+  right: 10%;
+  top: 15%;
+  width: 250px;
+  height: 320px;
+  background: #154a22;
+  border-radius: 16px;
+  overflow: hidden;
+  z-index: 3;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.expertImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.9;
+}
+
+.expertInfo {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 1.5rem;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+}
+
+.expertName {
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.expertTitle {
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+.chatBubble {
+  position: absolute;
+  top: 5%;
+  left: 20%;
+  background: #003912;
+  padding: 0.75rem 1rem;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 10;
+}
+
+.dots {
+  display: flex;
+  gap: 4px;
+}
+
+.dots span {
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.5;
+}
+
+.cursorWrapper {
+  position: absolute;
+  bottom: 10%;
+  right: 5%;
+  z-index: 20;
+}
+
+@media (max-width: 1200px) {
+  .inner {
+    padding: 3rem;
+    flex-direction: column;
+    text-align: center;
+  }
+  .content {
+    max-width: 100%;
+    margin-bottom: 3rem;
+  }
+  .visual {
+    width: 280px;
+    height: 320px;
+  }
+}
+
+@media (max-width: 992px) {
+  .inner {
+    flex-direction: column;
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+  
+  .content {
+    max-width: 100%;
+    margin-bottom: 4rem;
+  }
+  
+  .brand {
+    justify-content: center;
+  }
+  
+  .benefits {
+    display: inline-block;
+    text-align: left;
+  }
+  
+  .visual {
+    width: 250px;
+    height: 320px;
+  }
+  
+  .cardBack1, .cardBack2, .mainCard {
+    right: 0;
+    top: 0;
+  }
+}

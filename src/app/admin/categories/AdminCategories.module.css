@@ -1,0 +1,111 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #212529;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.categoryTree {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.rootCategory {
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.rootCategory:last-child {
+  border-bottom: none;
+}
+
+.categoryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+}
+
+.categoryRow:hover {
+  background: #f8f9fa;
+}
+
+.nodeInfo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.icon {
+  font-size: 1.25rem;
+}
+
+.name {
+  font-weight: 700;
+  color: #212529;
+}
+
+.slug {
+  font-size: 0.8125rem;
+  color: #adb5bd;
+  font-family: monospace;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.actionBtn {
+  background: none;
+  border: none;
+  color: #6c757d;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.actionBtn:hover {
+  color: #0066FF;
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  color: #fa5252;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.subCategories {
+  padding-left: 3rem;
+  background: #fcfcfc;
+}
+
+.subCategory {
+  border-top: 1px solid #f1f3f5;
+}
+
+.leafCategories {
+  padding-left: 2rem;
+  background: white;
+}

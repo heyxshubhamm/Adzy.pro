@@ -1,0 +1,173 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+  background: white;
+}
+
+.main {
+  flex: 1;
+  padding: 2rem 0;
+  background: #fdfdfd;
+}
+
+.hero {
+  margin-bottom: 3.5rem;
+  text-align: center;
+}
+
+.bannerWrapper {
+  width: 100%;
+  height: 200px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #154a22;
+  margin-bottom: 2rem;
+}
+
+.banner {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.title {
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: #404145;
+  margin-bottom: 0.75rem;
+  letter-spacing: -1px;
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  color: #62646a;
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  color: #404145;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2rem;
+}
+
+.subCard {
+  background: white;
+  border: 1px solid #dadbdd;
+  border-radius: 8px;
+  overflow: hidden;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.subCard:hover {
+  box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+}
+
+.subCardTop {
+  height: 140px;
+  background: #f1f1f1;
+}
+
+.placeholderImg {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #e0e0e0, #f8f8f8);
+}
+
+.subCardBottom {
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.subName {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #404145;
+}
+
+.arrow {
+  color: #b5b6ba;
+  font-weight: 700;
+}
+
+.marketplaceView {
+  padding-top: 1rem;
+}
+
+.filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.listingCount {
+  font-size: 0.875rem;
+  color: #74767e;
+  font-weight: 600;
+}
+
+.sortSelect {
+  padding: 0.5rem 1rem;
+  border: 1px solid #dadbdd;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #404145;
+  font-weight: 600;
+}
+
+.listingGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2rem;
+}
+
+.allGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.allCard {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.allCard:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.allIcon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.allName {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #404145;
+}
+
+@media (max-width: 992px) {
+  .layout {
+    flex-direction: column;
+  }
+}

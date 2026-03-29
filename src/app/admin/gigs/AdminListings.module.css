@@ -1,0 +1,110 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #212529;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.tableWrapper {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  background: #f8f9fa;
+  padding: 1rem 1.5rem;
+  text-align: left;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #495057;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table td {
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid #f1f3f5;
+  font-size: 0.875rem;
+  color: #212529;
+}
+
+.domain {
+  font-weight: 700;
+  color: #0066FF;
+}
+
+.status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.pending {
+  background: #FFF9DB;
+  color: #F59F00;
+}
+
+.approved {
+  background: #EBFBEE;
+  color: #37B24D;
+}
+
+.rejected {
+  background: #FFF5F5;
+  color: #F03E3E;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.approve {
+  color: #37B24D;
+  background: none;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reject {
+  color: #F03E3E;
+  background: none;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.delete {
+  color: #adb5bd;
+  background: none;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.empty {
+  text-align: center;
+  padding: 4rem 0;
+  color: #adb5bd;
+  font-style: italic;
+}

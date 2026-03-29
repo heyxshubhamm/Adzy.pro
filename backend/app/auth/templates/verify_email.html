@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <style>
+    body { font-family: -apple-system, sans-serif; background: #000; margin: 0; padding: 40px 20px; color: #fff; }
+    .card { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 12px; max-width: 480px; margin: 0 auto; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .logo { font-size: 20px; font-weight: 800; color: #00f0ff; margin-bottom: 32px; letter-spacing: 0.05em; text-transform: uppercase; }
+    h1 { font-size: 24px; font-weight: 800; color: #fff; margin: 0 0 12px; text-transform: uppercase; }
+    p { font-size: 15px; color: rgba(255,255,255,0.7); line-height: 1.6; margin: 0 0 24px; }
+    .btn { display: inline-block; background: #00f0ff; color: #000; text-decoration: none;
+           padding: 14px 28px; border-radius: 8px; font-size: 14px; font-weight: 800; text-transform: uppercase; }
+    .expire { font-size: 13px; color: rgba(255,255,255,0.4); margin-top: 24px; }
+    .url-fallback { font-size: 11px; color: rgba(255,255,255,0.2); word-break: break-all; margin-top: 24px; border-top: 1px solid #1a1a1a; padding-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Adzy.pro Intelligence</div>
+    <h1>Verify Identity</h1>
+    <p>System identification loop initiated for {{ username }}. Click the authorized link below to activate your marketplace credentials.</p>
+    <a href="{{ verify_url }}" class="btn">Confirm Entry</a>
+    <p class="expire">Security window expires in 24 hours.</p>
+    <p class="url-fallback">Fallback telemetry: {{ verify_url }}</p>
+  </div>
+</body>
+</html>
