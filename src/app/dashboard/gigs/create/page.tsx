@@ -5,6 +5,7 @@ import { useGigFormStore } from "@/store/gigFormStore";
 import { apiFetch } from "@/lib/apiFetch";
 import { useRouter } from "next/navigation";
 import styles from "./GigWizard.module.css";
+import { MediaGallery } from "@/components/MediaGallery/MediaGallery";
 
 export default function CreateListingWizard() {
   const { user, loading } = useAuth();
@@ -14,6 +15,7 @@ export default function CreateListingWizard() {
   const [gigId, setGigId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [mediaReady, setMediaReady] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || user.role !== "seller")) {
@@ -66,47 +68,6 @@ export default function CreateListingWizard() {
       setError(err instanceof Error ? err.message : "Failed to save gig.");
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function handleGalleryUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !gigId) return;
-
-    try {
-      const { upload_url, raw_key, processed_key, public_url } = await apiFetch<{
-        upload_url: string;
-        raw_key: string;
-        processed_key: string;
-        public_url: string;
-      }>(`/gigs/${gigId}/media/presign`, {
-        method: "POST",
-        body: JSON.stringify({ filename: file.name, content_type: file.type, media_type: "image", file_size: file.size }),
-      });
-
-      await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-
-      await apiFetch(`/gigs/${gigId}/media/confirm`, {
-        method: "POST",
-        body: JSON.stringify({ raw_key, processed_key, public_url, media_type: "image" }),
-      });
-
-      updateData({
-        media: [
-          ...data.media,
-          {
-            raw_key,
-            processed_key,
-            s3_key: processed_key,
-            url: public_url,
-            is_cover: data.media.length === 0,
-            media_type: "image",
-            status: "processing",
-          },
-        ],
-      });
-    } catch {
-      setError("Image upload failed. Please try again.");
     }
   }
 
@@ -346,32 +307,19 @@ export default function CreateListingWizard() {
         )}
 
         {/* ── Step 4: Gallery ── */}
-        {step === 4 && (
+        {step === 4 && gigId && (
           <div className={styles.stepForm}>
-            <h2 className={styles.subtitle ?? ""}>Add images to showcase your service</h2>
-            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>At least one image required to publish. Max 5.</p>
-            <div className={styles.mediaGrid}>
-              {data.media.map((m) => (
-                <div
-                  key={m.s3_key}
-                  className={styles.mediaSlot}
-                  style={{ backgroundImage: `url(${m.url})` }}
-                />
-              ))}
-              {data.media.length < 5 && (
-                <label className={styles.uploadBox}>
-                  <span>+ Upload Image</span>
-                  <input type="file" hidden onChange={handleGalleryUpload} accept="image/*" />
-                </label>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, marginBottom: 24 }}>
+              Upload images or videos to showcase your service. At least one image required to publish.
+            </p>
+            <MediaGallery gigId={gigId} onAllReady={() => setMediaReady(true)} />
+            <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
               <button type="button" onClick={() => setStep(3)} className={styles.submitBtn} style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}>
                 Back
               </button>
               <button
                 onClick={finalPublish}
-                disabled={submitting || data.media.length === 0}
+                disabled={submitting || !mediaReady}
                 className={`${styles.submitBtn} ${styles.publish}`}
                 style={{ flex: 1 }}
               >

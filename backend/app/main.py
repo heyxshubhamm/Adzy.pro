@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import suppress
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import auth, listings, tracking, orders, payments, admin, categories, verification, insights, roles, gigs, reviews, chat, disputes, kyc, sellers, score
 from app.core.config import settings
@@ -10,6 +10,7 @@ from app.services.market_levels import recompute_market_levels
 from app.services.market_scoring import ensure_default_weights, recompute_all_seller_scores
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
+from app.cache.client import check_redis_health, close_redis_pools
 
 class Item(BaseModel):
     name: str
@@ -32,6 +33,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
+
+
+@app.middleware("http")
+async def rate_limit_headers(request: Request, call_next) -> Response:
+    response: Response = await call_next(request)
+    remaining = getattr(request.state, "rate_limit_remaining", None)
+    if remaining is not None:
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+    return response
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(listings.router, prefix="/listings", tags=["listings"])
@@ -83,6 +93,16 @@ async def shutdown_tasks() -> None:
         task.cancel()
         with suppress(asyncio.CancelledError):
             await task
+    await close_redis_pools()
+    await engine.dispose()
+
+
+@app.get("/health")
+async def health_check():
+    return {
+        "redis": await check_redis_health(),
+        "status": "ok",
+    }
 
 @app.get("/")
 def read_root():

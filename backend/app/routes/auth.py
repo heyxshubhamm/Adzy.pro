@@ -19,6 +19,7 @@ from app.auth.email import send_verification_email, send_welcome_email
 from app.core.dependencies import get_current_user
 from app.core.config import settings
 from passlib.context import CryptContext
+from app.cache.rate_limit import login_limiter, register_limiter
 from authlib.integrations.starlette_client import OAuth
 from fastapi.responses import RedirectResponse
 from fastapi import Query
@@ -43,7 +44,7 @@ class ResendVerificationIn(BaseModel):
     email: EmailStr | None = None
 
 @router.post("/register", status_code=201)
-async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
+async def register(body: UserCreate, db: AsyncSession = Depends(get_db), _rl: None = Depends(register_limiter)):
     result = await db.execute(select(User).where(User.email == body.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -62,7 +63,7 @@ async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
     return {"message": "Account created. Check your email to verify."}
 
 @router.post("/login")
-async def login(body: LoginIn, response: Response, db: AsyncSession = Depends(get_db)):
+async def login(body: LoginIn, response: Response, db: AsyncSession = Depends(get_db), _rl: None = Depends(login_limiter)):
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 

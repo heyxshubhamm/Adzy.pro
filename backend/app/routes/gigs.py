@@ -17,6 +17,11 @@ from app.media.tasks import process_image, process_video
 import re
 from pydantic import BaseModel
 from app.services.market_scoring import stable_ab_bucket
+from app.cache.keys import K
+from app.cache.cache_aside import cache_get, cache_set, CacheMiss
+from app.cache.counters import increment_gig_view
+from app.cache.invalidation import invalidate_gig, invalidate_search_cache
+from app.cache.rate_limit import presign_limiter
 
 router = APIRouter(tags=["gigs"])
 
@@ -166,6 +171,16 @@ async def get_gig_detail(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
+    cache_key = K.fmt(K.GIG_DETAIL, slug=slug)
+    try:
+        cached_data = await cache_get(cache_key)
+        background_tasks.add_task(increment_gig_view, cached_data["id"])
+        return cached_data
+    except CacheMiss:
+        pass
+    except Exception:
+        pass  # Redis unavailable — fall through to DB
+
     result = await db.execute(
         select(Gig)
         .options(
@@ -226,8 +241,8 @@ async def get_gig_detail(
             review_count=row.review_count,
         ))
 
-    # Increment view count asynchronously
-    background_tasks.add_task(_increment_views, db, str(gig.id))
+    # Increment view count via Redis counter (batched flush to DB every 5 min)
+    background_tasks.add_task(increment_gig_view, str(gig.id))
 
     # Build seller public profile
     sp: SellerProfile | None = gig.seller.seller_profile
@@ -260,7 +275,7 @@ async def get_gig_detail(
         for r in reviews
     ]
 
-    return GigDetailOut(
+    detail = GigDetailOut(
         id=gig.id,
         title=gig.title,
         slug=gig.slug,
@@ -290,24 +305,22 @@ async def get_gig_detail(
         related_gigs=related_gigs,
     )
 
+    # Store in cache — TTL 5 min (ISR on the frontend revalidates every 60s anyway)
+    try:
+        await cache_set(cache_key, detail.model_dump(), ttl=300)
+    except Exception:
+        pass
+
+    return detail
+
 
 @router.post("/{gig_id}/impression", status_code=204)
 async def record_impression(
     gig_id: str,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db),
 ):
-    """Client-side impression tracker — increments views, fire-and-forget."""
-    background_tasks.add_task(_increment_views, db, gig_id)
-
-
-async def _increment_views(db: AsyncSession, gig_id: str):
-    await db.execute(
-        Gig.__table__.update()
-        .where(Gig.id == gig_id)
-        .values(views=Gig.views + 1)
-    )
-    await db.commit()
+    """Client-side impression tracker — increments Redis counter, fire-and-forget."""
+    background_tasks.add_task(increment_gig_view, gig_id)
 
 
 # --- List seller's own gigs ---
@@ -358,8 +371,11 @@ async def delete_gig(
     gig = result.scalar_one_or_none()
     if not gig or str(gig.seller_id) != str(user.id):
         raise HTTPException(status_code=404, detail="Gig not found")
+    old_slug = gig.slug
     gig.status = "deleted"
     await db.commit()
+    await invalidate_gig(old_slug)
+    await invalidate_search_cache()
 
 # --- Update gig ---
 @router.patch("/{gig_id}", response_model=GigOut)
@@ -376,6 +392,8 @@ async def update_gig(
         raise HTTPException(status_code=404, detail="Gig not found")
     if str(gig.seller_id) != str(user.id):
         raise HTTPException(status_code=403, detail="Not your gig")
+
+    old_slug = gig.slug
 
     # Update base fields
     for field in ("title", "description", "category_id", "subcategory", "tags"):
@@ -398,6 +416,11 @@ async def update_gig(
             db.add(GigRequirement(gig_id=gig.id, sort_order=i, **req.model_dump()))
 
     await db.commit()
+
+    # Invalidate old slug (and new slug if title changed — it's a cache miss anyway)
+    await invalidate_gig(old_slug)
+    await invalidate_search_cache()
+
     result2 = await db.execute(select(Gig).where(Gig.id == gig.id).options(*_load_gig_options()))
     return result2.scalar_one()
 
@@ -441,6 +464,10 @@ async def publish_gig(
 
     gig.status = "active"
     await db.commit()
+
+    await invalidate_gig(gig.slug)
+    await invalidate_search_cache()
+
     result2 = await db.execute(select(Gig).where(Gig.id == gig.id).options(*_load_gig_options()))
     return result2.scalar_one()
 
@@ -452,6 +479,7 @@ async def presign_media_upload(
     body: PresignedURLRequest,
     user: User = Depends(require_seller),
     db: AsyncSession = Depends(get_db),
+    _rl: None = Depends(presign_limiter),
 ):
     result = await db.execute(select(Gig).where(Gig.id == gig_id))
     gig = result.scalar_one_or_none()
