@@ -1,6 +1,6 @@
 import uuid
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Numeric, Text, Enum, ARRAY
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Numeric, Text, Enum, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.session import Base
@@ -49,7 +49,7 @@ class Gig(Base):
     description = Column(Text, nullable=False)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
     subcategory = Column(String(100))
-    tags = Column(ARRAY(String), default=[])
+    tags = Column(JSON, default=list)
     seller_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     status = Column(String, default="draft") # draft, active, paused, deleted
     
@@ -99,7 +99,7 @@ class GigPackage(Base):
     price = Column(Numeric(10, 2), nullable=False)
     delivery_days = Column(Integer, nullable=False)
     revisions = Column(Integer, default=1)
-    features = Column(ARRAY(String), default=[])
+    features = Column(JSON, default=list)
 
     gig = relationship("Gig", back_populates="packages")
 
@@ -110,7 +110,7 @@ class GigRequirement(Base):
     gig_id = Column(UUID(as_uuid=True), ForeignKey("gigs.id"), nullable=False)
     question = Column(Text, nullable=False)
     input_type = Column(String(20), default="text") # text, textarea, file, multiple_choice
-    choices = Column(ARRAY(String))
+    choices = Column(JSON, default=list)
     is_required = Column(Boolean, default=True)
     sort_order = Column(Integer, default=0)
 
@@ -125,7 +125,7 @@ class GigMedia(Base):
     raw_key = Column(Text, nullable=False)             # original S3 key
     processed_key = Column(Text, nullable=True)        # processed S3 key (set after Celery)
     url = Column(Text, nullable=False)                 # public CDN URL (cover size)
-    processed_urls = Column(JSONB, default={})         # {cover, thumbnail, small, video_url, ...}
+    processed_urls = Column(JSON, default=dict)         # {cover, thumbnail, small, video_url, ...}
     status = Column(String(20), default="processing")  # processing | ready | error
     sort_order = Column(Integer, default=0)
     is_cover = Column(Boolean, default=False)
@@ -188,8 +188,8 @@ class SellerProfile(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
     display_name = Column(String(100), nullable=False)
     bio = Column(Text)
-    skills = Column(ARRAY(String))
-    languages = Column(ARRAY(String))
+    skills = Column(JSON, default=list)
+    languages = Column(JSON, default=list)
     country = Column(String(100))
     seller_level = Column(String(20), default="new")
     response_time = Column(Integer)

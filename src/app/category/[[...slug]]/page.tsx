@@ -7,9 +7,9 @@ import ListingGrid from "@/components/Marketplace/ListingGrid";
 import styles from './CategoryPage.module.css';
 
 interface Props {
-  params: {
+  params: Promise<{
     slug?: string[];
-  };
+  }>;
 }
 
 // Mock listings for demonstration
@@ -19,8 +19,9 @@ const mockListings = [
   { id: 3, name: "SEO Audit", title: "I will perform a deep SEO audit", price: 150, niche: "SEO", seller: "Mark SEO", rating: 4.8, reviews: 210, traffic: "25k", dr: 82 },
 ];
 
-export default async function CategoryPage({ params }: { params: { slug?: string[] } }) {
-  const slugArray = params.slug || [];
+export default async function CategoryPage({ params }: Props) {
+  const resolvedParams = await params;
+  const slugArray = resolvedParams.slug || [];
   const currentSlug = slugArray[slugArray.length - 1];
   
   let currentCategory: any = null;

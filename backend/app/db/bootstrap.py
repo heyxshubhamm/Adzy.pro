@@ -1,5 +1,7 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
+from app.db.session import Base
+import app.models.models  # noqa: F401
 
 
 async def _get_table_columns(engine: AsyncEngine, table_name: str) -> set[str]:
@@ -24,6 +26,10 @@ async def _get_table_columns(engine: AsyncEngine, table_name: str) -> set[str]:
 
 
 async def ensure_market_schema(engine: AsyncEngine) -> None:
+    # Ensure core ORM tables exist before running additive ALTERs.
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     user_columns = await _get_table_columns(engine, "users")
     gig_columns = await _get_table_columns(engine, "gigs")
 
