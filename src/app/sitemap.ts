@@ -1,50 +1,54 @@
 import { MetadataRoute } from 'next';
-import { api } from '@/lib/api';
 
 const BASE_URL = 'https://adzy.pro';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+async function safeFetch<T>(url: string): Promise<T[]> {
+  try {
+    const res = await fetch(url, { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // 1. Static Routes
-  const staticRoutes = [
-    '',
-    '/marketplace',
-    '/admin',
-    '/login',
-    '/register',
-  ].map((route) => ({
-    url: `${BASE_URL}${route}`,
+  // 1. Static app routes
+  const staticRoutes: MetadataRoute.Sitemap = [
+    { url: BASE_URL,                  lastModified: new Date(), changeFrequency: 'daily',   priority: 1.0 },
+    { url: `${BASE_URL}/marketplace`, lastModified: new Date(), changeFrequency: 'daily',   priority: 0.9 },
+    { url: `${BASE_URL}/login`,       lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${BASE_URL}/signup`,      lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
+  ];
+
+  // 2. CMS static pages from backend
+  const pages = await safeFetch<{ slug: string }>(`${API}/pages/`);
+  const pageRoutes: MetadataRoute.Sitemap = pages.map((p) => ({
+    url: `${BASE_URL}/pages/${p.slug}`,
     lastModified: new Date(),
-    changeFrequency: 'daily' as const,
-    priority: 1.0,
+    changeFrequency: 'monthly',
+    priority: 0.6,
   }));
 
-  // 2. Fetch Categories
-  let categoryRoutes: MetadataRoute.Sitemap = [];
-  try {
-    const categories: any[] = await api('/categories');
-    categoryRoutes = categories.map((cat) => ({
-      url: `${BASE_URL}/category/${cat.slug}`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly' as const,
-      priority: 0.8,
-    }));
-  } catch (e) {
-    console.error('Sitemap: Failed to fetch categories', e);
-  }
+  // 3. Categories
+  const categories = await safeFetch<{ slug: string }>(`${API}/categories`);
+  const categoryRoutes: MetadataRoute.Sitemap = categories.map((cat) => ({
+    url: `${BASE_URL}/category/${cat.slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
 
-  // 3. Fetch Listings
-  let listingRoutes: MetadataRoute.Sitemap = [];
-  try {
-    const listings: any[] = await api('/listings');
-    listingRoutes = listings.map((l) => ({
-      url: `${BASE_URL}/listing/${l.slug}`,
-      lastModified: new Date(l.created_at),
-      changeFrequency: 'monthly' as const,
-      priority: 0.6,
-    }));
-  } catch (e) {
-    console.error('Sitemap: Failed to fetch listings', e);
-  }
+  // 4. Active gigs
+  const gigs = await safeFetch<{ slug: string; updated_at: string }>(`${API}/gigs?status=active&limit=500`);
+  const gigRoutes: MetadataRoute.Sitemap = gigs.map((g) => ({
+    url: `${BASE_URL}/gigs/${g.slug}`,
+    lastModified: g.updated_at ? new Date(g.updated_at) : new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
 
-  return [...staticRoutes, ...categoryRoutes, ...listingRoutes];
+  return [...staticRoutes, ...pageRoutes, ...categoryRoutes, ...gigRoutes];
 }
+

@@ -132,3 +132,11 @@ ul {
 .btn-premium-light:hover {
   background: #f0f0f0 !important;
 }
+
+/* React 18 View Transitions for Menu Layout */
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+}

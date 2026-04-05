@@ -67,7 +67,7 @@ def _create_engine() -> AsyncEngine:
 
 engine = _create_engine()
 
-AsyncSessionLocal = async_sessionmaker(
+async_session_factory = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
     autocommit=False,
@@ -82,7 +82,7 @@ Base = declarative_base()
 
 # ── FastAPI dependency ───────────────────────────────────────────────────────
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionLocal() as session:
+    async with async_session_factory() as session:
         try:
             yield session
             await session.commit()
@@ -96,7 +96,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 # ── Context manager for non-request code (Celery tasks, scripts) ─────────────
 @asynccontextmanager
 async def get_db_context() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionLocal() as session:
+    async with async_session_factory() as session:
         try:
             yield session
             await session.commit()

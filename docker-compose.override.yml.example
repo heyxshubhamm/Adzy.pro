@@ -1,0 +1,36 @@
+# ── Local overrides — copy to docker-compose.override.yml (gitignored) ────────
+# docker-compose.override.yml is merged automatically by `docker compose up`.
+# Use this file to add personal dev tweaks without touching the shared compose.
+#
+# Examples below — uncomment and adapt what you need.
+
+# version: "3.9"  # not needed in Compose v2+
+
+services:
+
+  # Expose pgBouncer on a non-standard local port (e.g. if 6432 conflicts)
+  # pgbouncer:
+  #   ports:
+  #     - "16432:6432"
+
+  # Run backend with debugpy attached (VS Code / PyCharm remote debug)
+  # backend:
+  #   command: >
+  #     python -m debugpy --listen 0.0.0.0:5678 --wait-for-client
+  #     -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  #   ports:
+  #     - "8000:8000"
+  #     - "5678:5678"   # debugpy
+
+  # Override memory limits if your machine has less RAM
+  # redis:
+  #   command: >
+  #     redis-server
+  #       --maxmemory 64mb
+  #       --maxmemory-policy allkeys-lru
+
+  # Add extra backend env vars without modifying .env
+  # backend:
+  #   environment:
+  #     LOG_LEVEL: debug
+  #     SENTRY_DSN: ""

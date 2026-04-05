@@ -22,6 +22,11 @@ from app.cache.cache_aside import cache_get, cache_set, CacheMiss
 from app.cache.counters import increment_gig_view
 from app.cache.invalidation import invalidate_gig, invalidate_search_cache
 from app.cache.rate_limit import presign_limiter
+from app.search.indexer import delete_gig_from_index, index_gig
+from app.services.claude_service import claude_service
+import os
+
+_USE_ELASTIC = os.getenv("USE_ELASTICSEARCH", "false").lower() == "true"
 
 router = APIRouter(tags=["gigs"])
 
@@ -32,6 +37,39 @@ def _load_gig_options():
         selectinload(Gig.media),
         selectinload(Gig.seller),
     )
+
+async def enrich_gig_metadata(gig_id: uuid_lib.UUID, db_factory):
+    """Background task: run AI risk analysis and update gig fields."""
+    async with db_factory() as db:
+        result = await db.execute(select(Gig).where(Gig.id == gig_id))
+        gig = result.scalar_one_or_none()
+        if not gig:
+            return
+
+        try:
+            # Price is resolved from packages if available
+            price = 0.0
+            avg_price_result = await db.execute(
+                select(func.avg(GigPackage.price)).where(GigPackage.gig_id == gig_id)
+            )
+            price = float(avg_price_result.scalar() or 0.0)
+
+            risk_data = await claude_service.analyze_listing_risk(
+                gig.title,
+                gig.description,
+                0,   # DR placeholder
+                "0", # Traffic placeholder
+                price,
+            )
+            gig.risk_score = risk_data.get("risk_score", 0)
+            gig.risk_report = risk_data.get("report")
+
+            if gig.risk_score > 50:
+                gig.status = "draft"
+        except Exception:
+            pass
+
+        await db.commit()
 
 # --- Public marketplace list ---
 @router.get("", response_model=List[GigOut])
@@ -122,6 +160,7 @@ def _validate_media_keys(raw_key: str, processed_key: str, seller_id: str, gig_i
 @router.post("", response_model=GigOut, status_code=201)
 async def create_gig(
     body: GigCreateIn,
+    background_tasks: BackgroundTasks,
     user: User = Depends(require_seller),
     db: AsyncSession = Depends(get_db),
 ):
@@ -145,6 +184,11 @@ async def create_gig(
         db.add(GigRequirement(gig_id=gig.id, sort_order=i, **req.model_dump()))
 
     await db.commit()
+    
+    # Industrialize: Dispatch background risk analysis
+    from app.db.session import async_session_factory
+    background_tasks.add_task(enrich_gig_metadata, gig.id, async_session_factory)
+
     result2 = await db.execute(select(Gig).where(Gig.id == gig.id).options(*_load_gig_options()))
     return result2.scalar_one()
 
@@ -467,6 +511,8 @@ async def publish_gig(
 
     await invalidate_gig(gig.slug)
     await invalidate_search_cache()
+    if _USE_ELASTIC:
+        await index_gig(str(gig.id), db)
 
     result2 = await db.execute(select(Gig).where(Gig.id == gig.id).options(*_load_gig_options()))
     return result2.scalar_one()

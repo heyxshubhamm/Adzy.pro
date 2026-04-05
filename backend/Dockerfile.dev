@@ -1,0 +1,28 @@
+# ── Dev image — hot reload, all system deps ──────────────────────────────────
+FROM python:3.11-slim
+
+# System deps: psycopg build tools, curl (health check), ffmpeg (media processing)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        curl \
+        ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python deps first (layer-cached unless requirements change)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install dev extras (pytest, ruff, mypy, etc.)
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Source is mounted as a volume at runtime — COPY here just gives a baseline
+COPY . .
+
+EXPOSE 8000
+
+# --reload watches /app for changes (volume-mounted in compose)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app"]

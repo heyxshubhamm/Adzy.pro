@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import styles from './Header.module.css';
 import { auth, signOut } from '@/auth';
+import { MegaMenu } from './MegaMenu';
 
 const Header = async () => {
   const session = await auth();
@@ -16,7 +17,6 @@ const Header = async () => {
         
         <nav className={styles.nav}>
           <ul className={styles.navList}>
-            <li><Link href="/category/programming-tech" className={styles.navLink}>Categories</Link></li>
             <li><Link href="/adzy-pro" className={styles.navLink}>Adzy Pro</Link></li>
             <li><Link href="/sell" className={styles.navLink}>Become a Seller</Link></li>
             <li><Link href="/about" className={styles.navLink}>How it Works</Link></li>
@@ -42,6 +42,13 @@ const Header = async () => {
               <Link href="/signup" className="btn btn-primary">Join</Link>
             </>
           )}
+        </div>
+      </div>
+      
+      {/* ── Desktop Interactive Mega Menu Sub-navigation ── */}
+      <div className={styles.megaMenuContainer || "mega-menu-wrapper"}>
+        <div className="container">
+          <MegaMenu />
         </div>
       </div>
     </header>

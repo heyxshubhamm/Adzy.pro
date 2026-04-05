@@ -3,85 +3,116 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  BUYER
-  SELLER
-  ADMIN
-}
-
-enum ListingStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-enum OrderStatus {
-  PENDING
-  IN_PROGRESS
-  LIVE
-  REPLACED
-  CANCELLED
-}
-
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  name      String?
-  role      UserRole  @default(BUYER)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  listings  Listing[] @relation("SellerListings")
-  orders    Order[]   @relation("BuyerOrders")
+  id             String   @id @default(uuid()) @db.Uuid
+  username       String   @unique
+  email          String   @unique
+  hashedPassword String   @map("hashed_password")
+  role           String   @default("buyer")
+  isActive       Boolean  @default(true) @map("is_active")
+  isVerified     Boolean  @default(false) @map("is_verified")
+  
+  riskScore      Decimal  @default(0.0) @map("risk_score") @db.Decimal(5, 2)
+  trustScore     Decimal  @default(100.0) @map("trust_score") @db.Decimal(5, 2)
+  
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  gigs           Gig[]
+  ordersBought   Order[]
+  
+  @@map("users")
+}
+
+model Gig {
+  id           String   @id @default(uuid()) @db.Uuid
+  title        String
+  slug         String   @unique
+  description  String   @db.Text
+  status       String   @default("draft")
+  
+  rating       Decimal  @default(5.0) @db.Decimal(3, 2)
+  reviewsCount Int      @default(0) @map("reviews_count")
+  
+  sellerId     String   @db.Uuid @map("seller_id")
+  seller       User     @relation(fields: [sellerId], references: [id])
+  
+  categoryId   String?  @db.Uuid @map("category_id")
+  category     Category? @relation(fields: [categoryId], references: [id])
+  
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  orders       Order[]
+  
+  @@map("gigs")
 }
 
 model Category {
-  id          String     @id @default(uuid())
-  name        String
-  slug        String     @unique
-  icon        String?
-  description String?
-  banner      String?
-  parentId    String?
-  parent      Category?  @relation("SubCategories", fields: [parentId], references: [id])
-  children    Category[] @relation("SubCategories")
-  listings    Listing[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-}
-
-model Listing {
-  id           String        @id @default(uuid())
-  name         String        // Domain name
-  niche        String
-  traffic      String
-  dr           Int
-  price        Float
-  status       ListingStatus @default(PENDING)
-  sellerId     String
-  seller       User          @relation("SellerListings", fields: [sellerId], references: [id])
-  categoryId   String?
-  category     Category?     @relation(fields: [categoryId], references: [id])
-  orders       Order[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  trafficProof String?       // URL to GA proof or screenshot
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  parentId  String?  @db.Uuid @map("parent_id")
+  
+  gigs      Gig[]
+  
+  @@map("categories")
 }
 
 model Order {
-  id         String      @id @default(uuid())
-  listingId  String
-  listing    Listing     @relation(fields: [listingId], references: [id])
-  buyerId    String
-  buyer      User        @relation("BuyerOrders", fields: [buyerId], references: [id])
-  status     OrderStatus @default(PENDING)
-  linkUrl    String?     // Target URL for the backlink
-  anchorText String?
-  details    String?     // Special instructions
-  liveUrl    String?     // URL where the link is live
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id         String   @id @default(uuid()) @db.Uuid
+  buyerId    String   @db.Uuid @map("buyer_id")
+  buyer      User     @relation(fields: [buyerId], references: [id])
+  gigId      String   @db.Uuid @map("gig_id")
+  gig        Gig      @relation(fields: [gigId], references: [id])
+  price      Decimal  @db.Decimal(10, 2)
+  status     String   @default("PENDING")
+  
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  
+  payment    Payment?
+
+  @@map("orders")
+}
+
+model Payment {
+  id               String   @id @default(uuid()) @db.Uuid
+  orderId          String   @unique @db.Uuid @map("order_id")
+  order            Order    @relation(fields: [orderId], references: [id])
+  amount           Decimal  @db.Decimal(10, 2)
+  status           String   @default("PENDING")
+  razorpayOrderId  String?  @unique @map("razorpay_order_id")
+  
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("payments")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  adminId    String   @db.Uuid @map("admin_id")
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  payload    Json?
+  chainHash  String?  @map("chain_hash")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("admin_audit_log")
+}
+
+model FraudAlert {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid @map("user_id")
+  alertType String   @map("alert_type")
+  severity  Int      @default(1)
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("fraud_alerts")
 }

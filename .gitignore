@@ -1,5 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Nested clone (EC2 deploy artifact)
+/Adzy.pro
+
 # dependencies
 /node_modules
 /.pnp
@@ -45,3 +48,13 @@ next-env.d.ts
 # python
 __pycache__/
 *.py[cod]
+.venv/
+venv/
+*.db
+*.sqlite
+
+# docker local overrides
+docker-compose.override.yml
+
+# keep example, ignore real .env (already covered above)
+!.env.example

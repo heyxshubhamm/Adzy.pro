@@ -1,114 +1,140 @@
 "use client";
-
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { useRegisterMutation } from "@/store/api";
 
 export default function SignupPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [form, setForm] = useState({ username: "", email: "", password: "", is_seller: false });
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  
+  const [register, { isLoading: loading }] = useRegisterMutation();
 
-  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
 
     try {
-      const res = await fetch(`${API}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, username, password }),
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || "Registration failed");
-      }
-
-      router.push("/verify-email");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Registration failed");
-    } finally {
-      setLoading(false);
+      await register(form).unwrap();
+      setSuccess(true);
+      // Protocol: Redirect to verification gate after a delay
+      setTimeout(() => router.push("/login?verified=0"), 3000);
+    } catch (err: any) {
+      setError(err?.data?.detail || err?.message || "Registration protocol failure.");
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0b] px-4">
-      <motion.div
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden font-inter">
+      {/* Background Neural Grid */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none">
+        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+      </div>
+
+      <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full space-y-8 bg-[#161618] p-10 rounded-2xl border border-white/5 shadow-2xl"
+        className="max-w-md w-full relative z-10"
       >
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-white tracking-tight">
-            Create your Adzy account
-          </h2>
-          <p className="mt-2 text-sm text-gray-400">
-            Join the marketplace. Buy or sell services in minutes.
-          </p>
-        </div>
+        <div className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 rounded-[40px] p-12 shadow-2xl shadow-indigo-500/10 transition-all">
+           <div className="text-center mb-12">
+              <h2 className="text-4xl font-black text-white tracking-tighter uppercase mb-3">Node Initialization</h2>
+              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed opacity-60">
+                 Join the <span className="text-indigo-400">Adzy Marketplace Ecosystem</span>
+              </p>
+           </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSignup}>
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
+           {success ? (
+             <div className="space-y-6 text-center animate-in zoom-in-95 fade-in duration-700">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/10 rounded-3xl border border-emerald-500/20 shadow-inner mb-4">
+                   <span className="text-4xl">📩</span>
+                </div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter">Verification Sent</h3>
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed opacity-60 px-6">
+                   Check your terminal for the activation link. Redirecting to access gate...
+                </p>
+             </div>
+           ) : (
+             <form onSubmit={handleSignup} className="space-y-6">
+                {error && (
+                  <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-[10px] font-black text-rose-400 uppercase tracking-widest text-center animate-in slide-in-from-top-2">
+                     {error}
+                  </div>
+                )}
 
-          <div className="space-y-4">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="appearance-none relative block w-full px-4 py-3 bg-[#1e1e21] border border-white/5 placeholder-gray-500 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all sm:text-sm"
-              placeholder="Email address"
-            />
-            <input
-              type="text"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="appearance-none relative block w-full px-4 py-3 bg-[#1e1e21] border border-white/5 placeholder-gray-500 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all sm:text-sm"
-              placeholder="Username"
-              minLength={3}
-            />
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="appearance-none relative block w-full px-4 py-3 bg-[#1e1e21] border border-white/5 placeholder-gray-500 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all sm:text-sm"
-              placeholder="Password"
-              minLength={8}
-            />
-          </div>
+                <div className="space-y-4">
+                   <div className="relative group">
+                      <label className="absolute -top-2 left-6 px-2 bg-slate-900 text-[8px] font-black text-slate-400 uppercase tracking-widest z-20">Identity Username</label>
+                      <input
+                        type="text"
+                        required
+                        value={form.username}
+                        onChange={(e) => setForm({...form, username: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-sm text-white font-medium outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                        placeholder="jmiller_adzy"
+                      />
+                   </div>
+                   <div className="relative group">
+                      <label className="absolute -top-2 left-6 px-2 bg-slate-900 text-[8px] font-black text-slate-400 uppercase tracking-widest z-20">Identity Email</label>
+                      <input
+                        type="email"
+                        required
+                        value={form.email}
+                        onChange={(e) => setForm({...form, email: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-sm text-white font-medium outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                        placeholder="name@agency.com"
+                      />
+                   </div>
+                   <div className="relative group">
+                      <label className="absolute -top-2 left-6 px-2 bg-slate-900 text-[8px] font-black text-slate-400 uppercase tracking-widest z-20">Secure Access Pin</label>
+                      <input
+                        type="password"
+                        required
+                        value={form.password}
+                        onChange={(e) => setForm({...form, password: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-sm text-white font-medium outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                        placeholder="••••••••"
+                      />
+                   </div>
+                </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50"
-          >
-            {loading ? "Creating account..." : "Create account"}
-          </button>
-        </form>
+                <div className="p-6 bg-indigo-500/5 rounded-3xl border border-white/5 flex items-center justify-between group cursor-pointer hover:bg-indigo-500/10 transition-colors"
+                     onClick={() => setForm({...form, is_seller: !form.is_seller})}
+                >
+                   <div>
+                      <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Seller Protocol?</h4>
+                      <p className="text-[8px] text-slate-500 font-black uppercase tracking-tighter mt-1">Unlock merchant-tier dashboard</p>
+                   </div>
+                   <div className={`w-10 h-5 rounded-full transition-all relative ${form.is_seller ? 'bg-indigo-500 shadow-lg shadow-indigo-500/20' : 'bg-slate-800'}`}>
+                      <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all ${form.is_seller ? 'translate-x-5' : ''}`} />
+                   </div>
+                </div>
 
-        <div className="text-center text-sm">
-          <span className="text-gray-500">Already have an account? </span>
-          <Link href="/login" className="font-semibold text-blue-500 hover:text-blue-400">
-            Sign in
-          </Link>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all duration-500 shadow-xl ${loading ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-white text-slate-900 hover:bg-slate-100 hover:scale-[1.02] active:scale-[0.98] shadow-white/5'}`}
+                >
+                  {loading ? 'Initializing...' : 'Confirm Registration'}
+                </button>
+             </form>
+           )}
+
+           <div className="mt-12 text-center text-[9px] font-black uppercase tracking-widest">
+              <span className="text-slate-500">Already Initialized? </span>
+              <Link href="/login" className="text-emerald-400 hover:text-emerald-300 transition-colors">
+                Identity Access
+              </Link>
+           </div>
         </div>
       </motion.div>
+
+      {/* Abstract Visual Nodes */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-indigo-600/20 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-emerald-600/10 blur-[120px] rounded-full pointer-events-none" />
     </div>
   );
 }

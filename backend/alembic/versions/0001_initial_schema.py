@@ -20,10 +20,10 @@ def upgrade() -> None:
 
     if not is_sqlite:
         # ── Postgres extensions ───────────────────────────────────────────────
-        op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
-        op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
-        op.execute("CREATE EXTENSION IF NOT EXISTS unaccent")
-        op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+        if op.get_context().dialect.name == "postgresql": op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
+        if op.get_context().dialect.name == "postgresql": op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+        if op.get_context().dialect.name == "postgresql": op.execute("CREATE EXTENSION IF NOT EXISTS unaccent")
+        if op.get_context().dialect.name == "postgresql": op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
 
     # ── categories ───────────────────────────────────────────────────────────
     op.create_table(
@@ -97,15 +97,15 @@ def upgrade() -> None:
 
     if not is_sqlite:
         # GIN index for tag array search
-        op.execute("CREATE INDEX idx_gigs_tags_gin ON gigs USING gin(tags)")
+        if op.get_context().dialect.name == "postgresql": op.execute("CREATE INDEX idx_gigs_tags_gin ON gigs USING gin(tags)")
         # Full-text search index
-        op.execute("""
+        if op.get_context().dialect.name == "postgresql": op.execute("""
             CREATE INDEX idx_gigs_fts ON gigs
             USING gin(to_tsvector('english',
                 coalesce(title,'') || ' ' || coalesce(description,'')))
         """)
         # Trigram index for ILIKE title search
-        op.execute("CREATE INDEX idx_gigs_title_trgm ON gigs USING gin(title gin_trgm_ops)")
+        if op.get_context().dialect.name == "postgresql": op.execute("CREATE INDEX idx_gigs_title_trgm ON gigs USING gin(title gin_trgm_ops)")
 
     # ── gig_packages ──────────────────────────────────────────────────────────
     op.create_table(
@@ -325,7 +325,7 @@ def downgrade() -> None:
 
     bind = op.get_bind()
     if bind.dialect.name != "sqlite":
-        op.execute("DROP EXTENSION IF EXISTS pgcrypto")
-        op.execute("DROP EXTENSION IF EXISTS unaccent")
-        op.execute("DROP EXTENSION IF EXISTS pg_trgm")
-        op.execute('DROP EXTENSION IF EXISTS "uuid-ossp"')
+        if op.get_context().dialect.name == "postgresql": op.execute("DROP EXTENSION IF EXISTS pgcrypto")
+        if op.get_context().dialect.name == "postgresql": op.execute("DROP EXTENSION IF EXISTS unaccent")
+        if op.get_context().dialect.name == "postgresql": op.execute("DROP EXTENSION IF EXISTS pg_trgm")
+        if op.get_context().dialect.name == "postgresql": op.execute('DROP EXTENSION IF EXISTS "uuid-ossp"')

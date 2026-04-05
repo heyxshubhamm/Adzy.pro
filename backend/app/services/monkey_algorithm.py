@@ -59,11 +59,8 @@ def _sign(value: float) -> float:
 
 class MonkeyAlgorithm:
     """
-    Monkey Algorithm (MA) with climb, watch-jump, somersault phases.
-
-    This implementation follows Zhao & Tang (2008) mechanics while adding
-    production-safe guards: feasibility retries, clipping to bounds, and
-    convergence early stop per monkey climb loop.
+    Advanced Monkey Algorithm (AMA) with SPSA pseudo-gradients, momentum climbing,
+    Levy-flight watching, and strict elitism. 
     """
 
     def __init__(self, problem: ProblemDefinition, config: MonkeyConfig):
@@ -96,11 +93,16 @@ class MonkeyAlgorithm:
         best_val = self._evaluate(best)
         history: list[float] = [best_val]
 
-        for _ in range(self.cfg.cycles):
+        for cycle in range(self.cfg.cycles):
+            # Adaptive Parameter Cooling Schedule
+            progress = cycle / max(1, self.cfg.cycles - 1)
+            current_eyesight = self.cfg.eyesight * math.exp(-3.0 * progress)
+            current_step = self.cfg.step_length * math.exp(-2.0 * progress)
+
             for idx in range(len(monkeys)):
-                monkeys[idx] = self._climb(monkeys[idx])
-                monkeys[idx] = self._watch_jump(monkeys[idx])
-                monkeys[idx] = self._climb(monkeys[idx])
+                monkeys[idx] = self._climb(monkeys[idx], current_step)
+                monkeys[idx] = self._watch_jump(monkeys[idx], current_eyesight)
+                monkeys[idx] = self._climb(monkeys[idx], current_step)
 
                 val = self._evaluate(monkeys[idx])
                 if self._better(val, best_val):
@@ -114,7 +116,9 @@ class MonkeyAlgorithm:
                 if self._better(v, best_val):
                     best = m[:]
                     best_val = v
-
+            
+            # Elitism: Always inject the absolute best monkey back into the troop
+            monkeys[0] = best[:]
             history.append(best_val)
 
         feasible_ratio = (self.feasible_hits / self.feasible_checks) if self.feasible_checks else 1.0
@@ -161,58 +165,83 @@ class MonkeyAlgorithm:
             "Failed to sample a feasible point. Check constraints/bounds or increase max_feasible_attempts."
         )
 
-    def _climb(self, x0: Vector) -> Vector:
+    def _climb(self, x0: Vector, current_step: float) -> Vector:
         x = x0[:]
         current_val = self._evaluate(x)
         no_improve = 0
+        direction_multiplier = 1.0 if self.problem.mode == "max" else -1.0
+        
+        # Velocity for Adam-inspired momentum
+        v = [0.0] * self.problem.dim
 
         for _ in range(self.cfg.climb_iterations):
-            delta = [self.cfg.step_length if self.rng.random() < 0.5 else -self.cfg.step_length for _ in range(self.problem.dim)]
-            x_plus = self._clip_bounds([xi + di for xi, di in zip(x, delta)])
-            x_minus = self._clip_bounds([xi - di for xi, di in zip(x, delta)])
-
-            # If perturbation gets infeasible due to nonlinear constraints, skip this step.
+            # Simultaneous Perturbation Stochastic Approximation (SPSA)
+            # Achieves O(1) gradient estimation regardless of dimension
+            delta = [1.0 if self.rng.random() < 0.5 else -1.0 for _ in range(self.problem.dim)]
+            
+            grad_step = min(current_step, 1e-4) # small step for gradient
+            x_plus = self._clip_bounds([xi + grad_step * dj for xi, dj in zip(x, delta)])
+            x_minus = self._clip_bounds([xi - grad_step * dj for xi, dj in zip(x, delta)])
+            
             if not self._is_feasible(x_plus) or not self._is_feasible(x_minus):
                 no_improve += 1
-                if no_improve >= self.cfg.convergence_patience:
-                    break
+                if no_improve >= self.cfg.convergence_patience: break
                 continue
 
             f_plus = self._evaluate(x_plus)
             f_minus = self._evaluate(x_minus)
 
             pseudo_grad = []
-            for d in delta:
-                # From the paper: g_j ~= (f(x+delta)-f(x-delta)) / (2*delta_j)
-                # since delta_j in {+a, -a}
-                pseudo_grad.append((f_plus - f_minus) / (2.0 * d))
+            for j in range(self.problem.dim):
+                d_total = x_plus[j] - x_minus[j]
+                if abs(d_total) > 1e-12:
+                    pseudo_grad.append((f_plus - f_minus) / d_total)
+                else:
+                    pseudo_grad.append(0.0)
 
-            y = self._clip_bounds([xi + self.cfg.step_length * _sign(gj) for xi, gj in zip(x, pseudo_grad)])
+            if all(g == 0.0 for g in pseudo_grad):
+                no_improve += 1
+                if no_improve >= self.cfg.convergence_patience: break
+                continue
+
+            # Accumulate velocity (momentum)
+            for j in range(self.problem.dim):
+                v[j] = 0.7 * v[j] + 0.3 * pseudo_grad[j]
+
+            # Move in direction of momentum
+            y = self._clip_bounds([xi + direction_multiplier * current_step * _sign(vj) for xi, vj in zip(x, v)])
+            
             if self._is_feasible(y):
                 y_val = self._evaluate(y)
-                if self._better(y_val, current_val) or abs(y_val - current_val) <= self.cfg.convergence_tol:
+                if self._better(y_val, current_val):
                     x = y
                     current_val = y_val
                     no_improve = 0
+                elif abs(y_val - current_val) <= self.cfg.convergence_tol:
+                    x = y
+                    current_val = y_val
+                    no_improve += 1
                 else:
                     no_improve += 1
             else:
                 no_improve += 1
 
-            if no_improve >= self.cfg.convergence_patience:
-                break
+            if no_improve >= self.cfg.convergence_patience: break
 
         return x
 
-    def _watch_jump(self, x: Vector) -> Vector:
+    def _watch_jump(self, x: Vector, current_eyesight: float) -> Vector:
         current = x[:]
         current_val = self._evaluate(current)
 
         for _ in range(self.cfg.max_watch_attempts):
-            y = [
-                self.rng.uniform(max(low, xi - self.cfg.eyesight), min(high, xi + self.cfg.eyesight))
-                for xi, (low, high) in zip(current, self.problem.bounds)
-            ]
+            u = self.rng.random()
+            # 1% chance for a massive jump (30x eyesight) to clear deep local minima
+            scale = current_eyesight * (u ** -0.5) if u > 0.01 else current_eyesight * 30.0
+            
+            y = [xi + self.rng.uniform(-scale, scale) for xi in current]
+            y = self._clip_bounds(y)
+            
             if not self._is_feasible(y):
                 continue
             y_val = self._evaluate(y)

@@ -1,0 +1,18 @@
+# ── Dev image — Next.js hot reload ───────────────────────────────────────────
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install deps into the image layer (node_modules volume shadows this at runtime,
+# but having it here means a fresh volume gets populated on first start)
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Source is volume-mounted at runtime
+COPY . .
+
+EXPOSE 3000
+
+ENV NEXT_TELEMETRY_DISABLED=1
+
+CMD ["npm", "run", "dev"]

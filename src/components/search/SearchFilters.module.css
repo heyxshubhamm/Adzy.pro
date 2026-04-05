@@ -1,0 +1,108 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.clearAll {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: none;
+  border: 0.5px solid var(--color-border-secondary, #2a2a2e);
+  border-radius: 8px;
+  color: var(--color-text-info, #7b7fff);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.1s;
+}
+
+.clearAll:hover {
+  background: var(--color-background-secondary, #1e1e21);
+}
+
+.section {
+  padding: 14px 0;
+  border-bottom: 0.5px solid var(--color-border-tertiary, #222226);
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.heading {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary, #6b6b7b);
+  margin: 0 0 10px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filterBtn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--color-text-secondary, #a0a0b0);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, color 0.1s;
+}
+
+.filterBtn:hover {
+  background: var(--color-background-secondary, #1e1e21);
+  color: var(--color-text-primary, #f0f0f0);
+}
+
+.filterBtn.active {
+  background: rgba(83, 74, 183, 0.15);
+  color: #a09aff;
+}
+
+.count {
+  font-size: 11px;
+  color: var(--color-text-tertiary, #6b6b7b);
+}
+
+.priceRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.priceInput {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  background: var(--color-background-secondary, #1e1e21);
+  border: 0.5px solid var(--color-border-secondary, #2a2a2e);
+  border-radius: 6px;
+  color: var(--color-text-primary, #f0f0f0);
+  font-size: 13px;
+  outline: none;
+}
+
+.priceInput:focus {
+  border-color: #534AB7;
+}
+
+.priceSep {
+  color: var(--color-text-tertiary, #6b6b7b);
+  font-size: 13px;
+}

@@ -9,6 +9,7 @@ pydantic-settings
 python-dotenv
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt<4          # passlib 1.7.4 incompatible with bcrypt 4+ (detect_wrap_bug uses >72-byte test)
 python-multipart
 redis
 authlib
@@ -19,3 +20,8 @@ anthropic
 razorpay
 resend
 sentry-sdk
+pgvector
+celery
+strawberry-graphql[fastapi]
+joblib
+numpy

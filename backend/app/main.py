@@ -2,22 +2,32 @@ import asyncio
 from contextlib import suppress
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, listings, tracking, orders, payments, admin, categories, verification, insights, roles, gigs, reviews, chat, disputes, kyc, sellers, score
+from app.routes import auth, tracking, orders, payments, admin, categories, verification, insights, roles, gigs, reviews, chat, disputes, kyc, sellers, score, admin_config, admin_automation, cms, wallet, inbox
+from app.routes.admin import fraud, compliance, support, analytics, telemetry
+from app.search import router as search_router
 from app.core.config import settings
 from app.db.bootstrap import ensure_market_schema
 from app.db.session import AsyncSessionLocal, engine
 from app.services.market_levels import recompute_market_levels
 from app.services.market_scoring import ensure_default_weights, recompute_all_seller_scores
 from starlette.middleware.sessions import SessionMiddleware
+from app.core.security_middleware import AdminSecurityMiddleware
 from pydantic import BaseModel
 from app.cache.client import check_redis_health, close_redis_pools
+from app.db.session import check_db_connection
 
 class Item(BaseModel):
     name: str
     price: float
     is_offer: bool | None = None
 
+from strawberry.fastapi import GraphQLRouter
+from .schemas.graphql import schema
+
 app = FastAPI(title=settings.PROJECT_NAME)
+
+graphql_app = GraphQLRouter(schema)
+app.include_router(graphql_app, prefix="/api/v1/graphql")
 
 cors_allowed_origins = [
     origin.strip()
@@ -32,6 +42,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AdminSecurityMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
 
 
@@ -44,7 +55,6 @@ async def rate_limit_headers(request: Request, call_next) -> Response:
     return response
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(listings.router, prefix="/listings", tags=["listings"])
 app.include_router(gigs.router, prefix="/gigs", tags=["gigs"])
 app.include_router(tracking.router, prefix="/track", tags=["tracking"])
 app.include_router(orders.router, prefix="/orders", tags=["orders"])
@@ -61,6 +71,22 @@ app.include_router(disputes.router)
 app.include_router(kyc.router)
 app.include_router(sellers.router, prefix="/sellers", tags=["sellers"])
 app.include_router(score.router)
+app.include_router(search_router.router)
+app.include_router(admin_config.admin_router)
+app.include_router(admin_config.public_router, prefix="/api/v1")
+app.include_router(admin_automation.router)
+app.include_router(fraud.router,    prefix="/api/v1")
+app.include_router(compliance.router, prefix="/api/v1")
+app.include_router(support.router,   prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(telemetry.router, prefix="/api/v1")
+# Gap fills — CMS, Wallet, Messaging
+app.include_router(cms.public_router)
+app.include_router(cms.admin_router)
+app.include_router(cms.sitemap_router)
+app.include_router(wallet.seller_router)
+app.include_router(wallet.admin_router)
+app.include_router(inbox.router)
 
 
 async def _run_market_level_job() -> None:
@@ -99,9 +125,12 @@ async def shutdown_tasks() -> None:
 
 @app.get("/health")
 async def health_check():
+    redis_ok = await check_redis_health()
+    db_ok    = await check_db_connection()
     return {
-        "redis": await check_redis_health(),
-        "status": "ok",
+        "status":   "ok" if (redis_ok and db_ok) else "degraded",
+        "redis":    redis_ok,
+        "postgres": db_ok,
     }
 
 @app.get("/")

@@ -73,7 +73,7 @@ def calculate_base_score(listing: any, max_values: Dict[str, float]) -> float:
 
     return score
 
-def calculate_final_score(listing: any, max_values: Dict[str, float], total_impressions: int) -> float:
+def calculate_final_score(listing: any, max_values: Dict[str, float], total_impressions: int, context: dict = None) -> float:
     """
     MASTER UNIFIED FORMULA (adzy.pro PRD):
     Score = Base × Level × NewBoost × Freshness × Narad × (1 - RiskPenalty)
@@ -127,21 +127,50 @@ def calculate_final_score(listing: any, max_values: Dict[str, float], total_impr
         risk_penalty
     )
     
-    # 7. Bandit/UCB Contribution (Internal Learning)
+    # 7. Hybrid Contextual Bandit (LinUCB Conceptual)
     stats = getattr(listing, 'stats', None)
     gig_impressions = getattr(stats, 'impressions_count', 0) or 1
     gig_orders = getattr(stats, 'orders_count', 0) or 0
     total_imps = total_impressions or 1
     
     avg_reward = gig_orders / gig_impressions
-    exploration = math.sqrt((2 * math.log(total_imps)) / gig_impressions)
-    bandit_score = avg_reward + (0.5 * exploration) # Higher weight on exploration
+    
+    # Context Relevance Score (buyer context matches gig tags/category)
+    context_relevance = 1.0
+    if context:
+        buyer_tags = context.get('buyer_history_tags', [])
+        current_cat = context.get('current_category')
+        
+        # Boost exploration if buyer specifically acts in this vertical
+        match_count = 0
+        gig_tags = getattr(listing, 'tags', []) or []
+        for t in buyer_tags:
+            if t in gig_tags: match_count += 1
+            
+        gig_cat = getattr(listing, 'category', None)
+        cat_match = 1.5 if (gig_cat and current_cat and str(gig_cat.id) == str(current_cat)) else 1.0
+        
+        context_relevance = cat_match * (1.0 + 0.2 * match_count)
+    
+    # LinUCB-inspired exploration heavily weighted by context
+    exploration = math.sqrt((2 * math.log(total_imps)) / gig_impressions) * context_relevance
+    bandit_score = avg_reward + (0.5 * exploration)
     
     final_score += (0.1 * bandit_score)
     
+    # 8. Real-Time A/B Testing Matrix (Monkey Validation)
+    if context and context.get("ab_variant") == "monkey":
+        # In Monkey cohort, we boost heavily based on the mathematically 
+        # computed seller_score which tracks deep LTV metrics.
+        seller_score = float(getattr(listing.seller, "seller_score", 50.0) or 50.0) / 100.0
+        final_score = final_score * (1.0 + seller_score)
+    else:
+        # Default Cohort (A): standard hardcoded weights
+        pass
+    
     return final_score
 
-def rank_listings(listings: List[any]) -> List[any]:
+def rank_listings(listings: List[any], context: dict = None) -> List[any]:
     if not listings:
         return []
         
@@ -154,6 +183,6 @@ def rank_listings(listings: List[any]) -> List[any]:
     
     for l in listings:
         l.relevance_score = 0.5 
-        l.final_score = calculate_final_score(l, max_values, total_impressions)
+        l.final_score = calculate_final_score(l, max_values, total_impressions, context)
         
     return sorted(listings, key=lambda x: getattr(x, "final_score", 0), reverse=True)

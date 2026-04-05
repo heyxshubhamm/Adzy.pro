@@ -10,6 +10,7 @@ from app.services.claude_service import claude_service
 from app.services.leveling import leveling_service
 from typing import List
 from pydantic import BaseModel
+from sqlalchemy import func
 
 router = APIRouter(tags=["orders"])
 
@@ -218,3 +219,41 @@ async def get_my_orders(
         query.options(*_order_options()).order_by(Order.created_at.desc())
     )
     return result.scalars().all()
+@router.get("/stats")
+async def get_user_stats(
+    user: User = Depends(get_current_user),
+    db:   AsyncSession = Depends(get_db)
+):
+    """Aggregate telemetry for the current user's dashboard."""
+    # Buyer stats
+    orders_q = await db.execute(
+        select(func.count(Order.id), func.sum(Order.price))
+        .where(Order.buyer_id == user.id)
+    )
+    buyer_count, buyer_spent = orders_q.one_or_none() or (0, 0)
+
+    # Seller stats
+    seller_q = await db.execute(
+        select(func.count(Order.id), func.sum(Order.price))
+        .join(Gig, Order.gig_id == Gig.id)
+        .where(Gig.seller_id == user.id)
+    )
+    seller_count, seller_earned = seller_q.one_or_none() or (0, 0)
+
+    # Active Gigs
+    gigs_q = await db.execute(
+        select(func.count(Gig.id)).where(Gig.seller_id == user.id, Gig.status == "active")
+    )
+    active_gigs = gigs_q.scalar() or 0
+
+    return {
+        "buyer": {
+            "total_orders": buyer_count,
+            "total_spent": float(buyer_spent or 0.0),
+        },
+        "seller": {
+            "total_orders": seller_count,
+            "total_earned": float(seller_earned or 0.0),
+            "active_gigs": active_gigs,
+        }
+    }
