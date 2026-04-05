@@ -1,13 +1,13 @@
 "use client";
 
 import React from 'react';
-import { useListGigsQuery } from '@/store/api';
+import { useGetGigsQuery as useListGigsQuery } from '@/store/api';
 import ListingCard from '../Marketplace/ListingCard';
 import Link from 'next/link';
 
 const FeaturedMarketplace = () => {
   // Protocol: Fetch top-ranked active gigs using industrial RTK Query
-  const { data: gigs, isLoading, error } = useListGigsQuery({});
+  const { data: gigs, isLoading, error } = useListGigsQuery();
 
   if (isLoading) {
     return (

@@ -87,6 +87,10 @@ export const marketplaceApi = createApi({
       query: (q) => ({ url: 'gigs/', params: { q } }),
       providesTags: ['Gig'],
     }),
+    getAdminGigs: builder.query<{ gigs: any[]; total: number; pages: number }, { status?: string; search?: string; page?: number; limit?: number }>({
+      query: (params) => ({ url: '/admin/gigs', params }),
+      providesTags: ['Gig'],
+    }),
     getSearchGigs: builder.query<any, any>({
       query: (params) => ({ url: 'gigs/', params }),
       providesTags: ['Gig'],
@@ -587,6 +591,7 @@ export const {
   useGetFlagsQuery,
   useUpdateFlagMutation,
   useGetAuditLogsQuery,
+  useGetAdminGigsQuery,
   useGetSearchGigsQuery,
   useGetGigBySlugQuery,
   useGetUserStatsQuery,
@@ -599,6 +604,23 @@ export const {
   useCompleteOrderMutation,
   useGetDisputeQuery,
   useOpenDisputeMutation,
+  // Admin user/gig actions
+  useBanUserMutation,
+  useApproveGigMutation,
+  // Analytics
+  useGetAnalyticsDashboardQuery,
+  useGetSellerChurnQuery,
+  useGetBuyerLTVQuery,
+  useGetTopSellersAnalyticsQuery,
+  // CMS
+  useGetCMSPagesQuery,
+  useGetCMSPageQuery,
+  useCreateCMSPageMutation,
+  useUpdateCMSPageMutation,
+  useDeleteCMSPageMutation,
+  useGetSitemapEntriesQuery,
+  useCreateSitemapEntryMutation,
+  useDeleteSitemapEntryMutation,
   // Auth
   useLoginMutation,
   useRegisterMutation,

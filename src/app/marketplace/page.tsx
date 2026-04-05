@@ -118,7 +118,7 @@ function MarketplaceContent() {
                  ))}
                </div>
             ) : (
-               <GigGrid gigs={displayGigs} />
+               <GigGrid gigs={displayGigs as any[]} />
             )}
 
             {/* Pagination / Load More Industrial Node */}

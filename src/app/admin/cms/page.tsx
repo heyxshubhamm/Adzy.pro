@@ -69,7 +69,7 @@ export default function ContentCommand() {
                  {pages?.map(page => (
                     <tr key={page.id} className="hover:bg-slate-50/30 transition-colors group">
                        <td className="p-5">
-                          <StatusBadge status={page.is_published ? 'PUBLISHED' : 'DRAFT'} level={page.is_published ? 'success' : 'warning'} />
+                          <StatusBadge status={page.is_published ? 'PUBLISHED' : 'DRAFT'} />
                        </td>
                        <td className="p-5 font-black text-slate-900 uppercase text-xs tracking-tight group-hover:text-indigo-600 transition-colors">{page.title}</td>
                        <td className="p-5 text-[10px] text-slate-400 font-mono italic">/{page.slug}</td>

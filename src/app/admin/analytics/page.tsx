@@ -148,10 +148,7 @@ export default function AnalyticsIntelligence() {
                         <td className="p-5 text-[10px] text-slate-400 font-mono italic">{s.email}</td>
                         <td className="p-5 text-[10px] font-black text-slate-400 uppercase tracking-tighter">{s.last_order ? new Date(s.last_order).toLocaleDateString() : 'NEVER'}</td>
                         <td className="p-5 text-right">
-                           <SeverityBadge 
-                              level={s.days_inactive > 60 ? 1 : 2} 
-                              text={`${s.days_inactive === 999 ? '∞' : s.days_inactive}d Inactive`} 
-                           />
+                           <SeverityBadge level={s.days_inactive > 60 ? 1 : 2} />
                         </td>
                      </tr>
                    ))}

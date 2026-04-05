@@ -175,7 +175,6 @@ export default async function OrderDetailPage({
               <h3>Dispute</h3>
               <DisputePanel
                 orderId={order.id}
-                token={token}
                 isDisputed={isDisputed}
               />
             </div>

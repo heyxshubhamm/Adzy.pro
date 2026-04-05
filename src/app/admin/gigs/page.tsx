@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
-import { 
-  useGetGigsQuery, 
+import {
+  useGetAdminGigsQuery,
   useApproveGigMutation,
   Gig
 } from '@/store/api';
@@ -12,9 +12,10 @@ export default function AdminGigsPage() {
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
 
   // RTK Query hooks
-  const { data: gigs, isLoading } = useGetGigsQuery({ 
-    status: statusFilter === "all" ? undefined : statusFilter 
+  const { data: gigsData, isLoading } = useGetAdminGigsQuery({
+    status: statusFilter === "all" ? undefined : statusFilter
   });
+  const gigs = gigsData?.gigs;
   const [approveGig] = useApproveGigMutation();
 
   const handleApprove = async () => {

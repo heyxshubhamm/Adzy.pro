@@ -34,7 +34,7 @@ export default function UniversalConfiguration() {
           <p className="text-slate-500 text-sm mt-1 font-medium font-inter italic tracking-tight">Marketplace Core Protocols & Operational Logic</p>
         </div>
         <div className="flex gap-4">
-           <StatusBadge status="LIVE" level="success" />
+           <StatusBadge status="LIVE" />
         </div>
       </div>
 

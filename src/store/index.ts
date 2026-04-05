@@ -6,7 +6,7 @@ export const store = configureStore({
     [marketplaceApi.reducerPath]: marketplaceApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(marketplaceApi.marketplaceApi.middleware),
+    getDefaultMiddleware().concat(marketplaceApi.middleware),
 });
 
 // For future slice additions (auth, ui, etc.)
